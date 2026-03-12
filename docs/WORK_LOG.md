@@ -112,6 +112,33 @@ estimatedTotal = sum of (clipDurations[i] ?? 60) for all clips
 
 ---
 
+### 下班前 — 匯出 Bug 修復 & UX 改善
+
+**Bug 3 — 匯出 Modal 崩潰（ReferenceError: clipLen is not defined）**：
+
+在多片段重構過程中，按鈕 `disabled` 條件殘留舊變數名稱 `clipLen`。
+瀏覽器 render 時拋出 ReferenceError，整個 Modal 直接崩潰，完全無法使用匯出功能。
+
+修復：`ExportModal.tsx` 第 414 行
+```diff
+- disabled={clipLen <= 0 || availableCams.length === 0}
++ disabled={exportDuration <= 0 || availableCams.length === 0}
+```
+`exportDuration` 是已定義的變數（`= endTime - startTime`）。TypeScript strict mode 編譯通過（commit 9ff2791）。
+
+**UX — 開始時間滑桿帶動結束時間**：
+
+原本只有當 start >= end 時才更新結束時間（防呆邏輯），導致拖動開始時間時結束時間不動，使用者體驗差。
+
+修改為拖動開始時間時**永遠**同步更新結束時間 = 開始 + 3 分鐘（clamped to total）：
+```diff
+- if (v >= endTime) setEndTime(Math.min(v + SOFT_LIMIT, estimatedTotal));
++ setEndTime(Math.min(v + SOFT_LIMIT, estimatedTotal));
+```
+效果：形成一個可滑動的「3 分鐘視窗」，結束滑桿仍可單獨微調（commit db678e1）。
+
+---
+
 ### 今日 Commit 記錄
 
 | Commit | 描述 |
@@ -119,6 +146,9 @@ estimatedTotal = sum of (clipDurations[i] ?? 60) for all clips
 | `f82aa6d` | feat: initial TesVault MVP with multi-clip navigation |
 | `a61743f` | fix: multi-clip timeline seek + multi-clip export with 3-min soft limit |
 | `5bdd0fc` | feat/fix: event list duration + Timeline stable estimatedTotal |
+| `4733472` | docs: add work log for 2026-03-11~12 |
+| `9ff2791` | fix: resolve ReferenceError clipLen → exportDuration in ExportModal |
+| `db678e1` | feat: start-time slider always drags end-time +3 min in ExportModal |
 
 ---
 
@@ -162,4 +192,4 @@ estimatedTotal = sum of (clipDurations[i] ?? 60) for all clips
 
 ---
 
-*最後更新：2026-03-12 17:38 CST*
+*最後更新：2026-03-12 18:30 CST*
