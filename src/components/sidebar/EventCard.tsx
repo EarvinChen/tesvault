@@ -48,6 +48,12 @@ export function EventCard({ event, isActive }: EventCardProps) {
   const cameraCount = event.cameras.size;
   const sizeFormatted = formatSize(event.totalSize);
 
+  // Estimate total duration from clip count (~60 s per clip)
+  const estimatedSeconds = event.clips.length * 60;
+  const durationMin  = Math.floor(estimatedSeconds / 60);
+  const durationSec  = String(estimatedSeconds % 60).padStart(2, '0');
+  const durationLabel = `${durationMin}:${durationSec}`;
+
   return (
     <button
       onClick={handleClick}
@@ -60,9 +66,12 @@ export function EventCard({ event, isActive }: EventCardProps) {
       <div className="flex items-start justify-between gap-2">
         {/* Left: type badge + info */}
         <div className="flex-1 min-w-0">
-          {/* Type badge */}
-          <div className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold mb-1 ${EVENT_TYPE_COLORS[event.type]}`}>
-            {EVENT_TYPE_LABELS[event.type]}
+          {/* Type badge + duration */}
+          <div className="flex items-center gap-1.5 mb-1">
+            <div className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${EVENT_TYPE_COLORS[event.type]}`}>
+              {EVENT_TYPE_LABELS[event.type]}
+            </div>
+            <span className="text-xs text-[#666]">⏱ {durationLabel}</span>
           </div>
 
           {/* Timestamp */}

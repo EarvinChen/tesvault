@@ -7,18 +7,24 @@ export function Timeline() {
   const currentTime     = useViewerStore((state) => state.currentTime);
   const duration        = useViewerStore((state) => state.duration);
   const clipOffset      = useViewerStore((state) => state.clipOffset);
-  const activeClipIndex = useViewerStore((state) => state.activeClipIndex);
+  const clipDurations   = useViewerStore((state) => state.clipDurations);
   const currentEvent    = useViewerStore((state) => state.currentEvent);
   const seekGlobal      = useViewerStore((state) => state.seekGlobal);
-
-  const totalClips = currentEvent?.clips.length ?? 1;
 
   // Global time = accumulated time of finished clips + current position
   const globalCurrentTime = clipOffset + currentTime;
 
-  // Estimated total duration: use actual duration for the current clip,
-  // plus 60 s for each remaining clip (approximate; clips are ~1 min each).
-  const estimatedTotal = clipOffset + duration + (totalClips - activeClipIndex - 1) * 60;
+  // Stable total duration: use actual clipDurations[] where known, 60 s estimate otherwise.
+  // This avoids sudden slider-max jumps when a short final clip (e.g. 27 s instead of 60 s)
+  // loads its metadata and the estimate would otherwise change significantly.
+  const estimatedTotal = useMemo(() => {
+    if (!currentEvent) return Math.max(duration, 1);
+    let total = 0;
+    for (let i = 0; i < currentEvent.clips.length; i++) {
+      total += clipDurations[i] ?? 60;
+    }
+    return Math.max(total, 1);
+  }, [currentEvent, clipDurations, duration]);
 
   // Format seconds as mm:ss
   const formatTime = (time: number) => {
