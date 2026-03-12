@@ -296,8 +296,8 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                   onChange={(e) => {
                     const v = parseFloat(e.target.value);
                     setStartTime(v);
-                    // Auto-set end to start + SOFT_LIMIT (soft clamp)
-                    if (v >= endTime) setEndTime(Math.min(v + SOFT_LIMIT, estimatedTotal));
+                    // Always keep end = start + 3 min (clamped to total)
+                    setEndTime(Math.min(v + SOFT_LIMIT, estimatedTotal));
                   }}
                   className="flex-1 accent-[#1d6adf]"
                 />
