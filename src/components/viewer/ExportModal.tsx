@@ -411,7 +411,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
               <>
                 <button
                   onClick={handleExport}
-                  disabled={clipLen <= 0 || availableCams.length === 0}
+                  disabled={exportDuration <= 0 || availableCams.length === 0}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#1d6adf] hover:bg-[#1558c0] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
