@@ -14,7 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { exportVideo, type ExportLayout, type ExportPhase } from '@/lib/export';
+import { exportVideo, type ClipSegment, type ExportLayout, type ExportPhase } from '@/lib/export';
 import { exportVideoCanvas, isCanvasExportSupported } from '@/lib/exportWebCodecs';
 import { useViewerStore } from '@/stores/viewer-store';
 import type { CameraPosition } from '@/types/tesla';
@@ -66,14 +66,20 @@ function fmtTime(s: number): string {
   return `${m}:${ss.toString().padStart(2, '0')}`;
 }
 
+// Soft export duration limit (seconds).  Auto-clamp end = start + SOFT_LIMIT.
+// If user manually extends beyond this, show a warning.
+const SOFT_LIMIT = 180; // 3 minutes
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
-  const duration     = useViewerStore((s) => s.duration);
-  const currentTime  = useViewerStore((s) => s.currentTime);
-  const cameraCount  = useViewerStore((s) => s.cameraCount);
-  const layoutMode   = useViewerStore((s) => s.layoutMode);
+  const duration      = useViewerStore((s) => s.duration);
+  const clipOffset    = useViewerStore((s) => s.clipOffset);
+  const clipDurations = useViewerStore((s) => s.clipDurations);
+  const currentTime   = useViewerStore((s) => s.currentTime);
+  const cameraCount   = useViewerStore((s) => s.cameraCount);
+  const layoutMode    = useViewerStore((s) => s.layoutMode);
   const focusedCamera = useViewerStore((s) => s.focusedCamera);
-  const currentEvent = useViewerStore((s) => s.currentEvent);
+  const currentEvent  = useViewerStore((s) => s.currentEvent);
 
   // ── Auto-detect export layout from current viewer state ──────────────────
   const autoLayout: ExportLayout = useMemo(() => {
@@ -87,11 +93,29 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
   const useHardwareEncoder = useMemo(() => isCanvasExportSupported(), []);
   const PHASE_LABELS = useHardwareEncoder ? PHASE_LABELS_HW : PHASE_LABELS_SW;
 
+  // ── Compute global (cross-clip) total duration ───────────────────────────
+  // Use actual clipDurations where known, otherwise estimate 60 s per clip
+  const totalClips = currentEvent?.clips.length ?? 1;
+  const estimatedTotal = useMemo(() => {
+    if (!currentEvent) return duration;
+    let total = 0;
+    for (let i = 0; i < currentEvent.clips.length; i++) {
+      total += clipDurations[i] ?? 60;
+    }
+    return total;
+  }, [currentEvent, clipDurations, duration]);
+
   // ── Form state ──────────────────────────────────────────────────────────────
-  const [startTime, setStartTime] = useState(0);
-  // Use lazy initializer so we capture duration at mount (duration is already
-  // loaded when the modal opens; this avoids a setState-in-effect lint error).
-  const [endTime,   setEndTime]   = useState(() => duration > 0 ? duration : 60);
+  // startTime / endTime are GLOBAL times (not per-clip local times)
+  const globalCurrentTime = clipOffset + currentTime;
+  const [startTime, setStartTime] = useState(() => 0);
+  const [endTime,   setEndTime]   = useState(() =>
+    Math.min(estimatedTotal, SOFT_LIMIT)
+  );
+
+  // ── Soft-limit warning ────────────────────────────────────────────────────
+  const exportDuration = endTime - startTime;
+  const overSoftLimit  = exportDuration > SOFT_LIMIT;
 
   // ── Export state ─────────────────────────────────────────────────────────────
   const [phase,       setPhase]       = useState<ExportPhase | null>(null);
@@ -105,6 +129,46 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
   const isDone        = phase === 'done';
   const isError       = phase === 'error';
 
+  // ── Build clip segments for multi-clip export ─────────────────────────────
+  /**
+   * Maps global [startTime, endTime] onto ClipSegment[].
+   * Uses known clipDurations[] for accuracy, falls back to 60 s estimate.
+   */
+  const buildClipSegments = useCallback((): ClipSegment[] => {
+    if (!currentEvent) return [];
+    const clips = currentEvent.clips;
+    const segments: ClipSegment[] = [];
+    let accumulated = 0;
+
+    for (let i = 0; i < clips.length; i++) {
+      const clipDur = clipDurations[i] ?? 60;
+      const clipEnd = accumulated + clipDur;
+
+      // Check if this clip overlaps with [startTime, endTime]
+      if (clipEnd <= startTime || accumulated >= endTime) {
+        accumulated = clipEnd;
+        continue;
+      }
+
+      // Local times within this clip
+      const localStart = Math.max(0, startTime - accumulated);
+      const localEnd   = Math.min(clipDur, endTime - accumulated);
+
+      // Build blobUrls for this clip from File objects
+      const clipBlobUrls: Partial<Record<CameraPosition, string>> = {};
+      clips[i].cameras.forEach((videoFile) => {
+        if (videoFile.file && videoFile.file.size > 0) {
+          clipBlobUrls[videoFile.camera] = URL.createObjectURL(videoFile.file);
+        }
+      });
+
+      segments.push({ blobUrls: clipBlobUrls, localStart, localEnd });
+      accumulated = clipEnd;
+    }
+
+    return segments;
+  }, [currentEvent, clipDurations, startTime, endTime]);
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
     if (isExporting) return;
@@ -113,21 +177,30 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
     setErrorMsg('');
     setDownloadUrl(null);
 
+    // Build clip segments for multi-clip export
+    const segments = buildClipSegments();
+    const createdUrls = segments.flatMap(seg => Object.values(seg.blobUrls).filter(Boolean) as string[]);
+
     const exportOptions = {
-      layout:           autoLayout,
-      singleCamera:     autoSingleCam,
-      blobUrls,
+      layout:          autoLayout,
+      singleCamera:    autoSingleCam,
+      blobUrls,        // legacy fallback (used only by FFmpeg path)
       startTime,
       endTime,
-      eventTimestamp:   currentEvent?.timestamp,
+      eventTimestamp:  currentEvent?.timestamp,
+      clipSegments:    segments.length > 0 ? segments : undefined,
+      globalStartTime: startTime,
       onPhase:    (p: ExportPhase) => setPhase(p),
       onProgress: (f: number) => setProgress(f),
       onComplete: (blob: Blob, fname: string) => {
+        // Revoke segment blob URLs after encoding is done
+        createdUrls.forEach(u => URL.revokeObjectURL(u));
         const url = URL.createObjectURL(blob);
         setDownloadUrl(url);
         setFilename(fname);
       },
       onError: (err: Error) => {
+        createdUrls.forEach(u => URL.revokeObjectURL(u));
         setErrorMsg(err.message);
         setPhase('error');
       },
@@ -138,7 +211,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
     } else {
       await exportVideo(exportOptions);
     }
-  }, [autoLayout, autoSingleCam, blobUrls, startTime, endTime, isExporting, useHardwareEncoder]);
+  }, [autoLayout, autoSingleCam, blobUrls, buildClipSegments, startTime, endTime, isExporting, useHardwareEncoder, currentEvent]);
 
   const handleReset = useCallback(() => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
@@ -157,9 +230,6 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
   }, [downloadUrl, filename]);
 
   useEffect(() => () => { if (downloadUrl) URL.revokeObjectURL(downloadUrl); }, [downloadUrl]);
-
-  // ── Clip info ─────────────────────────────────────────────────────────────────
-  const clipLen = endTime - startTime;
 
   return (
     <div
@@ -189,7 +259,10 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
           {/* Event info */}
           {currentEvent && (
             <div className="text-xs text-[#666] bg-[#1a1a1a] rounded-lg px-3 py-2">
-              {currentEvent.id}&nbsp;·&nbsp;總長 {fmtTime(duration)}
+              {currentEvent.id}&nbsp;·&nbsp;總長 {fmtTime(estimatedTotal)}
+              {totalClips > 1 && (
+                <span className="ml-1 text-[#444]">（{totalClips} 片段）</span>
+              )}
             </div>
           )}
 
@@ -207,23 +280,24 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
             </div>
           </div>
 
-          {/* Time range */}
+          {/* Time range — uses global time across all clips */}
           <div>
             <label className="block text-xs text-[#888] mb-2">
               時間範圍
               <span className="ml-1 text-[#555]">
-                {fmtTime(startTime)} → {fmtTime(endTime)}（{fmtTime(clipLen)}）
+                {fmtTime(startTime)} → {fmtTime(endTime)}（{fmtTime(exportDuration)}）
               </span>
             </label>
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[#666] w-8 shrink-0">開始</span>
-                <input type="range" min={0} max={duration} step={0.5} value={startTime}
+                <input type="range" min={0} max={estimatedTotal} step={0.5} value={startTime}
                   disabled={isExporting}
                   onChange={(e) => {
                     const v = parseFloat(e.target.value);
                     setStartTime(v);
-                    if (v >= endTime) setEndTime(Math.min(v + 1, duration));
+                    // Auto-set end to start + SOFT_LIMIT (soft clamp)
+                    if (v >= endTime) setEndTime(Math.min(v + SOFT_LIMIT, estimatedTotal));
                   }}
                   className="flex-1 accent-[#1d6adf]"
                 />
@@ -231,7 +305,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[#666] w-8 shrink-0">結束</span>
-                <input type="range" min={0} max={duration} step={0.5} value={endTime}
+                <input type="range" min={0} max={estimatedTotal} step={0.5} value={endTime}
                   disabled={isExporting}
                   onChange={(e) => {
                     const v = parseFloat(e.target.value);
@@ -242,19 +316,23 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                 />
                 <span className="text-xs text-[#aaa] w-10 text-right shrink-0">{fmtTime(endTime)}</span>
               </div>
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-2 mt-1 flex-wrap">
                 <button disabled={isExporting}
-                  onClick={() => { setStartTime(0); setEndTime(duration); }}
+                  onClick={() => {
+                    setStartTime(0);
+                    setEndTime(Math.min(estimatedTotal, SOFT_LIMIT));
+                  }}
                   className="text-xs text-[#666] hover:text-[#aaa] disabled:opacity-40">
-                  全片段
+                  全片段（最多 3 分鐘）
                 </button>
-                {currentTime > 0 && currentTime < duration && (
+                {globalCurrentTime > 0 && globalCurrentTime < estimatedTotal && (
                   <>
                     <span className="text-[#333]">·</span>
                     <button disabled={isExporting}
                       onClick={() => {
-                        setStartTime(Math.max(0, currentTime - 15));
-                        setEndTime(Math.min(duration, currentTime + 15));
+                        const s = Math.max(0, globalCurrentTime - 15);
+                        setStartTime(s);
+                        setEndTime(Math.min(estimatedTotal, s + 30));
                       }}
                       className="text-xs text-[#666] hover:text-[#aaa] disabled:opacity-40">
                       目前位置前後 15 秒
@@ -264,6 +342,13 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
               </div>
             </div>
           </div>
+
+          {/* Soft-limit warning */}
+          {overSoftLimit && !isExporting && (
+            <div className="text-xs text-yellow-500/80 bg-yellow-900/15 rounded-lg px-3 py-2">
+              ⚠️ 匯出超過 3 分鐘，畫面渲染時間較長，請耐心等候。
+            </div>
+          )}
 
           {/* Notice */}
           {useHardwareEncoder ? (

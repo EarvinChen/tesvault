@@ -16,6 +16,8 @@ export interface ViewerStoreState {
   activeClipIndex: number;
   /** Accumulated wall-clock seconds from clips 0 … activeClipIndex-1, used for global time display */
   clipOffset: number;
+  /** Actual durations (seconds) of each clip, filled in as videos load */
+  clipDurations: number[];
 
   // Layout state
   focusedCamera: CameraPosition | null;
@@ -46,6 +48,13 @@ export interface ViewerStoreState {
    * @param offset Accumulated seconds before this clip (for global time display)
    */
   setActiveClip: (index: number, offset: number) => void;
+  /** Record the actual duration of a loaded clip (called from VideoGrid handleLoadedMetadata) */
+  setClipDuration: (index: number, duration: number) => void;
+  /**
+   * Seek to a global time position across all clips.
+   * Will switch clips if the global time falls in a different clip.
+   */
+  seekGlobal: (globalTime: number) => void;
 }
 
 export const useViewerStore = create<ViewerStoreState>((set) => ({
@@ -59,6 +68,7 @@ export const useViewerStore = create<ViewerStoreState>((set) => ({
   isMuted: false,
   activeClipIndex: 0,
   clipOffset: 0,
+  clipDurations: [],
   focusedCamera: null,
   layoutMode: 'grid',
   cameraCount: 6,
@@ -83,6 +93,7 @@ export const useViewerStore = create<ViewerStoreState>((set) => ({
       currentEvent: event,
       activeClipIndex: 0,
       clipOffset: 0,
+      clipDurations: [],
       currentTime: 0,
       isPlaying: false,
       duration: event?.duration || 0,
@@ -93,4 +104,35 @@ export const useViewerStore = create<ViewerStoreState>((set) => ({
   closeExportModal: () => set({ showExportModal: false }),
   setActiveClip: (index: number, offset: number) =>
     set({ activeClipIndex: index, clipOffset: offset, currentTime: 0 }),
+  setClipDuration: (index: number, dur: number) =>
+    set((state) => {
+      const next = [...state.clipDurations];
+      next[index] = dur;
+      return { clipDurations: next };
+    }),
+  seekGlobal: (globalTime: number) =>
+    set((state) => {
+      if (!state.currentEvent) return {};
+      const clips = state.currentEvent.clips;
+      const durations = state.clipDurations;
+
+      // Walk through clips to find which one contains globalTime
+      let accumulated = 0;
+      for (let i = 0; i < clips.length; i++) {
+        // Use known actual duration, fall back to 60 s estimate
+        const clipDur = durations[i] ?? 60;
+        if (globalTime < accumulated + clipDur || i === clips.length - 1) {
+          const localTime = Math.max(0, Math.min(clipDur, globalTime - accumulated));
+          if (i === state.activeClipIndex) {
+            // Same clip — just update currentTime (VideoGrid seek effect handles it)
+            return { currentTime: localTime };
+          } else {
+            // Different clip — switch clip and seek within it
+            return { activeClipIndex: i, clipOffset: accumulated, currentTime: localTime };
+          }
+        }
+        accumulated += clipDur;
+      }
+      return {};
+    }),
 }));

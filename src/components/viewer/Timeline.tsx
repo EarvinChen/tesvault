@@ -9,7 +9,7 @@ export function Timeline() {
   const clipOffset      = useViewerStore((state) => state.clipOffset);
   const activeClipIndex = useViewerStore((state) => state.activeClipIndex);
   const currentEvent    = useViewerStore((state) => state.currentEvent);
-  const seek            = useViewerStore((state) => state.seek);
+  const seekGlobal      = useViewerStore((state) => state.seekGlobal);
 
   const totalClips = currentEvent?.clips.length ?? 1;
 
@@ -33,13 +33,10 @@ export function Timeline() {
   // Progress across the full estimated duration
   const progress = estimatedTotal > 0 ? (globalCurrentTime / estimatedTotal) * 100 : 0;
 
-  // Seeking: map the slider's global position back to a local clip time.
-  // For multi-clip events this is approximate (uses 60 s per clip); it keeps
-  // seeking within the current clip so the video doesn't have to reload.
+  // Seeking: pass the global time to seekGlobal which handles cross-clip navigation.
+  // seekGlobal uses actual clipDurations[] when available, falling back to 60 s/clip.
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const globalSeek = parseFloat(e.target.value);
-    const localTime  = Math.max(0, Math.min(duration, globalSeek - clipOffset));
-    seek(localTime);
+    seekGlobal(parseFloat(e.target.value));
   };
 
   return (

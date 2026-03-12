@@ -73,14 +73,32 @@ export type ExportPhase =
   | 'done'
   | 'error';
 
+/** One contiguous segment from a single 1-minute clip file */
+export interface ClipSegment {
+  blobUrls: Partial<Record<CameraPosition, string>>;
+  /** Seek position within this clip (seconds) — 0 for clips after the first */
+  localStart: number;
+  /** Stop position within this clip (seconds) — clip duration for clips before the last */
+  localEnd: number;
+}
+
 export interface ExportOptions {
   layout: ExportLayout;
   singleCamera: CameraPosition;
+  /** Legacy single-clip export: blobUrls for the current clip */
   blobUrls: Partial<Record<CameraPosition, string>>;
   startTime: number;
   endTime: number;
   /** Event recording start time — used to show real wall-clock time in watermark */
   eventTimestamp?: Date;
+  /**
+   * Multi-clip export: array of clip segments ordered chronologically.
+   * When provided, startTime/endTime and blobUrls are ignored.
+   * globalStartTime is the accumulated offset before the first segment's localStart,
+   * used for accurate watermark timestamps.
+   */
+  clipSegments?: ClipSegment[];
+  globalStartTime?: number;
   onPhase:    (phase: ExportPhase) => void;
   onProgress: (fraction: number)   => void;
   onComplete: (blob: Blob, filename: string) => void;

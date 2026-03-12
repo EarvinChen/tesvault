@@ -29,7 +29,7 @@
  *   - Firefox 101+: WebM (VP9)
  */
 
-import type { ExportOptions } from './export';
+import type { ClipSegment, ExportOptions } from './export';
 import type { CameraPosition } from '@/types/tesla';
 
 // Play at 1× to ensure correct output speed.
@@ -190,25 +190,154 @@ function drawWatermark(
   ctx.restore();
 }
 
+// ─── Single-segment canvas recorder ───────────────────────────────────────────
+
+/**
+ * Loads video elements for one clip segment, records them onto the canvas until
+ * localEnd, then pauses them. The MediaRecorder keeps running so clips stitch seamlessly.
+ *
+ * @param segment      The clip segment to record (blobUrls, localStart, localEnd)
+ * @param container    DOM container for hidden video elements
+ * @param ctx          Canvas 2D context to draw onto
+ * @param canvasLayout Layout dimensions and camera rects
+ * @param globalOffset Wall-clock seconds elapsed before this segment (for watermark)
+ * @param eventTs      Event recording timestamp (for watermark)
+ * @param totalDuration Total export duration across all segments (for progress)
+ * @param progressBase  Progress fraction already consumed by previous segments
+ * @param progressShare Fraction of total progress this segment should consume
+ * @param onProgress   Progress callback
+ */
+async function recordSegment(
+  segment: ClipSegment,
+  container: HTMLDivElement,
+  ctx: CanvasRenderingContext2D,
+  canvasLayout: ReturnType<typeof buildCanvasLayout>,
+  globalOffset: number,
+  eventTs: Date | null,
+  totalDuration: number,
+  progressBase: number,
+  progressShare: number,
+  onProgress: (f: number) => void,
+): Promise<void> {
+  const { blobUrls, localStart, localEnd } = segment;
+  const segDuration = localEnd - localStart;
+
+  const activeRects = canvasLayout.rects.filter(r => !!blobUrls[r.cam]);
+  if (activeRects.length === 0) return; // no cameras for this clip — skip silently
+
+  // Remove any existing video elements from a previous segment
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  // ── Load video elements for this segment ─────────────────────────────────
+  const videoEls = new Map<CameraPosition, HTMLVideoElement>();
+
+  await Promise.all(activeRects.map(({ cam }) =>
+    new Promise<void>((resolve, reject) => {
+      const vid = document.createElement('video');
+      vid.src = blobUrls[cam]!;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.preload = 'auto';
+      vid.style.cssText = 'width:2px;height:2px;object-fit:fill;';
+      container.appendChild(vid);
+      videoEls.set(cam, vid);
+      vid.onloadeddata = () => resolve();
+      vid.onerror = () => reject(new Error(`無法載入鏡頭影片：${cam}`));
+      vid.load();
+    })
+  ));
+
+  // ── Seek to localStart ────────────────────────────────────────────────────
+  await Promise.all([...videoEls.values()].map(vid =>
+    new Promise<void>(resolve => {
+      if (Math.abs(vid.currentTime - localStart) < 0.05) { resolve(); return; }
+      vid.onseeked = () => resolve();
+      vid.currentTime = localStart;
+    })
+  ));
+
+  // ── Start playback ────────────────────────────────────────────────────────
+  const primaryCam = activeRects.find(r => r.cam === 'front')?.cam ?? activeRects[0].cam;
+  const primaryVid = videoEls.get(primaryCam)!;
+
+  for (const vid of videoEls.values()) {
+    vid.playbackRate = PLAYBACK_RATE;
+    await vid.play().catch(() => {});
+  }
+
+  // ── Draw loop for this segment ────────────────────────────────────────────
+  await new Promise<void>(resolve => {
+    let rafId: number;
+    let lastTime = -1;
+
+    const draw = () => {
+      const elapsed = primaryVid.currentTime - localStart;
+
+      // Done when we've captured the segment's duration or video ended
+      if (elapsed >= segDuration - 0.05 || primaryVid.ended) {
+        cancelAnimationFrame(rafId);
+        resolve();
+        return;
+      }
+
+      if (primaryVid.currentTime !== lastTime) {
+        lastTime = primaryVid.currentTime;
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+        for (const { cam, x, y, w, h } of activeRects) {
+          const vid = videoEls.get(cam);
+          if (vid && vid.readyState >= 2) {
+            ctx.drawImage(vid, x, y, w, h);
+          }
+        }
+
+        // Watermark: global elapsed = pre-segment offset + elapsed within segment
+        drawWatermark(ctx, ctx.canvas.width, ctx.canvas.height, globalOffset + elapsed, 0, eventTs);
+
+        const segProgress = Math.min(elapsed / segDuration, 1);
+        onProgress(0.05 + (progressBase + segProgress * progressShare) * 0.9);
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    rafId = requestAnimationFrame(draw);
+  });
+
+  // Pause all videos — MediaRecorder keeps going for seamless stitching
+  for (const vid of videoEls.values()) vid.pause();
+}
+
 // ─── Main export ───────────────────────────────────────────────────────────────
 
 /**
  * Export video via canvas capture — no FFmpeg.wasm required.
  * Accepts the same ExportOptions as exportVideo() for drop-in use.
+ * Supports multi-clip export via options.clipSegments.
  */
 export async function exportVideoCanvas(options: ExportOptions): Promise<void> {
   const {
     layout, singleCamera, blobUrls, startTime, endTime,
-    eventTimestamp,
+    eventTimestamp, clipSegments, globalStartTime,
     onPhase, onProgress, onComplete, onError,
   } = options;
 
-  const duration = endTime - startTime;
+  // Normalise to a clipSegments array (single-clip path stays backward-compatible)
+  const segments: ClipSegment[] = clipSegments ?? [{
+    blobUrls,
+    localStart: startTime,
+    localEnd:   endTime,
+  }];
+
   const canvasLayout = buildCanvasLayout(layout, singleCamera);
 
-  // Only include cameras for which we have a blob URL
-  const activeRects = canvasLayout.rects.filter(r => !!blobUrls[r.cam]);
-  if (activeRects.length === 0) {
+  // Quick sanity check: at least one segment has a usable camera
+  const hasAnyCam = segments.some(seg =>
+    canvasLayout.rects.some(r => !!seg.blobUrls[r.cam])
+  );
+  if (!hasAnyCam) {
     onError(new Error('選定佈局中沒有可用的鏡頭影片'));
     return;
   }
@@ -216,47 +345,16 @@ export async function exportVideoCanvas(options: ExportOptions): Promise<void> {
   onPhase('preparing');
   onProgress(0);
 
-  // Container for video elements used during encoding.
-  // IMPORTANT: Must stay inside the viewport (not at -9999px) to prevent Chrome from
-  // throttling off-screen media elements — throttling causes the export to take 5× too long
-  // and MediaRecorder records 5× the expected duration.
-  // We use opacity:0.001 + z-index:-9999 to make it invisible to users while staying on-screen.
+  // Total duration across all segments (for progress calculation)
+  const totalDuration = segments.reduce((s, seg) => s + (seg.localEnd - seg.localStart), 0);
+
+  // Container for video elements — must stay visible to prevent Chrome throttling
   const container = document.createElement('div');
   container.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;overflow:visible;pointer-events:none;opacity:0.001;z-index:-9999;';
   document.body.appendChild(container);
 
   try {
-    // ── 1. Create + load hidden video elements ─────────────────────────────
-    const videoEls = new Map<CameraPosition, HTMLVideoElement>();
-
-    await Promise.all(activeRects.map(({ cam }) =>
-      new Promise<void>((resolve, reject) => {
-        const vid = document.createElement('video');
-        vid.src = blobUrls[cam]!;
-        vid.muted = true;
-        vid.playsInline = true;
-        vid.preload = 'auto';
-        vid.style.cssText = 'width:2px;height:2px;object-fit:fill;';
-        container.appendChild(vid);
-        videoEls.set(cam, vid);
-        vid.onloadeddata = () => resolve();
-        vid.onerror = () => reject(new Error(`無法載入鏡頭影片：${cam}`));
-        vid.load();
-      })
-    ));
-
-    // ── 2. Seek all videos to startTime ───────────────────────────────────
-    await Promise.all([...videoEls.values()].map(vid =>
-      new Promise<void>(resolve => {
-        if (Math.abs(vid.currentTime - startTime) < 0.05) { resolve(); return; }
-        vid.onseeked = () => resolve();
-        vid.currentTime = startTime;
-      })
-    ));
-
-    onProgress(0.05);
-
-    // ── 3. Set up composite canvas ────────────────────────────────────────
+    // ── Set up composite canvas ──────────────────────────────────────────
     const canvas = document.createElement('canvas');
     canvas.width  = canvasLayout.outW;
     canvas.height = canvasLayout.outH;
@@ -264,12 +362,11 @@ export async function exportVideoCanvas(options: ExportOptions): Promise<void> {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // ── 4. Set up MediaRecorder ───────────────────────────────────────────
+    // ── Set up MediaRecorder (starts once, spans all segments) ───────────
     const mimeType = getBestMimeType();
     const ext      = mimeType.includes('mp4') ? 'mp4' : 'webm';
     const stream   = canvas.captureStream(CAPTURE_FPS);
 
-    // Bitrate: six-camera at 1280×2486 needs more headroom
     const videoBitsPerSecond =
       layout === 'six'  ? 8_000_000 :
       layout === 'quad' ? 5_000_000 :
@@ -279,61 +376,30 @@ export async function exportVideoCanvas(options: ExportOptions): Promise<void> {
     const chunks: Blob[] = [];
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-    // ── 5. Start recording and playback ───────────────────────────────────
     onPhase('encoding');
-    recorder.start(200); // chunk every 200 ms
+    recorder.start(200);
 
-    for (const vid of videoEls.values()) {
-      vid.playbackRate = PLAYBACK_RATE;
-      await vid.play().catch(() => {});
+    // ── Record each segment sequentially ────────────────────────────────
+    let accumulatedDuration = 0;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      const segDuration = seg.localEnd - seg.localStart;
+      const progressBase  = totalDuration > 0 ? accumulatedDuration / totalDuration : 0;
+      const progressShare = totalDuration > 0 ? segDuration / totalDuration : 1;
+
+      // globalOffset for watermark: time already recorded + start offset before first clip
+      const wallOffset = (globalStartTime ?? 0) + accumulatedDuration;
+
+      await recordSegment(
+        seg, container as HTMLDivElement, ctx, canvasLayout,
+        wallOffset, eventTimestamp ?? null,
+        totalDuration, progressBase, progressShare, onProgress,
+      );
+
+      accumulatedDuration += segDuration;
     }
 
-    // ── 6. Draw loop ──────────────────────────────────────────────────────
-    const primaryCam = activeRects.find(r => r.cam === 'front')?.cam ?? activeRects[0].cam;
-    const primaryVid = videoEls.get(primaryCam)!;
-
-    await new Promise<void>(resolve => {
-      let rafId: number;
-      let lastTime = -1;
-
-      const draw = () => {
-        const elapsed = primaryVid.currentTime - startTime;
-
-        // Done when we've captured the requested duration or video ended
-        if (elapsed >= duration - 0.05 || primaryVid.ended) {
-          cancelAnimationFrame(rafId);
-          resolve();
-          return;
-        }
-
-        // Only re-paint when primary video has a new frame
-        if (primaryVid.currentTime !== lastTime) {
-          lastTime = primaryVid.currentTime;
-
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          for (const { cam, x, y, w, h } of activeRects) {
-            const vid = videoEls.get(cam);
-            if (vid && vid.readyState >= 2) {
-              ctx.drawImage(vid, x, y, w, h);
-            }
-          }
-
-          // Watermark: drawn last so it appears on top
-          drawWatermark(ctx, canvas.width, canvas.height, elapsed, startTime, eventTimestamp ?? null);
-
-          onProgress(0.05 + Math.min(elapsed / duration, 1) * 0.9);
-        }
-
-        rafId = requestAnimationFrame(draw);
-      };
-
-      rafId = requestAnimationFrame(draw);
-    });
-
-    // ── 7. Stop and package ───────────────────────────────────────────────
-    for (const vid of videoEls.values()) vid.pause();
+    // ── Stop and package ─────────────────────────────────────────────────
     recorder.stop();
 
     const blob = await new Promise<Blob>(resolve => {

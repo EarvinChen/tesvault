@@ -31,6 +31,7 @@ export function VideoGrid() {
   const showExportModal  = useViewerStore((s) => s.showExportModal);
   const closeExportModal = useViewerStore((s) => s.closeExportModal);
   const setActiveClip    = useViewerStore((s) => s.setActiveClip);
+  const setClipDuration  = useViewerStore((s) => s.setClipDuration);
 
   // ── Individual refs for each camera ──────────────────────────────────────
   const refs = useRef<Record<CameraPosition, React.RefObject<HTMLVideoElement | null>>>({
@@ -205,7 +206,10 @@ export function VideoGrid() {
   };
 
   const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    setDuration(e.currentTarget.duration);
+    const dur = e.currentTarget.duration;
+    setDuration(dur);
+    // Record the actual duration of this clip so seekGlobal can navigate accurately
+    setClipDuration(activeClipIndex, dur);
     if (lastSyncedTime.current > 0) {
       e.currentTarget.currentTime = lastSyncedTime.current;
     }

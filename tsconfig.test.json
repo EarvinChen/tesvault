@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "/tmp/tesvault-test",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "src/lib/tesla/parser.ts",
+    "src/lib/tesla/camera-config.ts",
+    "src/lib/video/sync-engine.ts",
+    "src/types/tesla.ts",
+    "tests/unit/parser.test.ts",
+    "tests/unit/sync-engine.test.ts",
+    "tests/unit/clip-navigation.test.ts"
+  ]
+}
