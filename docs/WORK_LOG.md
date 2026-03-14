@@ -285,4 +285,97 @@ iOS Safari 同時不支援：
 - Hook 回傳的 ref 若不在 return 值中暴露，使用方無法得知它的存在，各自建立新的 ref 就會造成斷開
 - 教訓：包含 ref 的 Hook，應將 ref 納入 return type，確保使用方和 Hook 共用同一個實例
 
-*最後更新：2026-03-14 17:00 CST*
+---
+
+### 晚上 — iOS UX 全面優化（五項修復）
+
+與使用者討論並確認四大問題後，一次合併上線（commit `2eb9f3b`）：
+
+#### 1. Import 卡在 Landing Page（useEffect 取代 setTimeout）
+
+原本：選完檔案後用 `setTimeout(500ms)` 等待 store 更新，在 iOS USB I/O 較慢時常超時，停留在首頁。
+
+修復：改用 `useEffect` 監聽 `isLoading + events.length`，狀態就緒才自動導向 `/viewer`。同時新增 loading spinner 並停用按鈕防重複點擊。
+
+#### 2. enrichEvents 並發限制（避免淹沒 iOS USB）
+
+原本：`Promise.all(events.map(enrichOne))` 全部同時讀取，iOS USB 頻寬不足時會逾時或回傳空值。
+
+修復：改為每批最多 4 個並發（`ENRICH_CONCURRENCY = 4`），依序處理所有事件，避免 I/O 擁塞。
+
+#### 3. 安全區域 + 100dvh（iPhone 瀏海 / Home Bar 遮擋）
+
+原先使用 `100vh`，在 iOS Safari 中瀏覽器 UI 會佔去一部分空間，導致 Timeline 被下方 Home Bar 遮擋。
+
+修復：
+- `layout.tsx`：`viewport.viewportFit = 'cover'`，`themeColor = '#1d6adf'`
+- `globals.css`：新增 `.safe-top` / `.safe-bottom` utility（`env(safe-area-inset-*)`）
+- Viewer page：`height: '100dvh'`（動態視口高度）
+- Sidebar：`calc(100dvh - 3.5rem)`
+- Timeline footer：`paddingBottom: max(0.5rem, env(safe-area-inset-bottom))`
+
+#### 4. PWA 支援（加到主畫面）
+
+新增 `public/manifest.json`、三組 icon（180 / 192 / 512px）以及 Apple meta tags，讓 iOS 使用者可將 TesVault 加到主畫面，以全螢幕模式執行（無瀏覽器 UI）。
+
+#### 5. iOS 多鏡頭匯出警告
+
+iOS 硬體 H.264 解碼器同時最多處理 2–4 路視訊，六鏡頭匯出時畫面會凍結。
+
+修復：偵測 iOS + 非單鏡頭配置時，在匯出 Modal 頂端顯示橙色警告卡片，引導使用者切換為「單鏡頭」模式再匯出。
+
+---
+
+### 晚上（續）— ExportModal 按鈕被切掉（兩輪修復）
+
+#### Round 1（commit `d3022d3`）
+
+Overlay 未套用 safe-area 水平 padding，iOS 橫向 notch 時按鈕超出邊界。
+
+修復：Overlay 加 `paddingLeft/Right: max(1rem, env(safe-area-inset-left/right))`，內層 Modal 移除 `mx-4`。
+
+#### Round 2（commit `e5488af`）
+
+Modal 無 `max-h` 限制，在小螢幕上 body 撐高後 footer 被 `overflow-hidden` 裁掉，按鈕消失。
+
+修復：Modal 改為 `flex flex-col + max-h-[90dvh]`，header/footer 設 `shrink-0`，body 設 `overflow-y-auto flex-1`，footer 加 `paddingBottom: max(1.25rem, env(safe-area-inset-bottom))`。此為標準 Mobile Modal 排版模式。
+
+#### 片段指示器文字縮短（commit `bd4050a`）
+
+`PlaybackControls.tsx` 的「片段 N/M」在多鏡頭列佔用過多空間，改為「N/M」並縮小 `min-w`（56px → 32px）。
+
+---
+
+### 今日 Commit 記錄（補充）
+
+| Commit | 描述 |
+|--------|------|
+| `2eb9f3b` | feat: iOS UX overhaul — import fix, enrichEvents throttle, safe-area, PWA, export warning |
+| `d3022d3` | fix: ExportModal overlay safe-area horizontal padding |
+| `e5488af` | fix: ExportModal footer clipped on iOS — flex col + max-h + shrink-0 footer |
+| `bd4050a` | fix: shorten clip indicator '片段 x/x' → 'x/x' to save space on mobile |
+
+---
+
+### 技術學習筆記（補充）
+
+**100dvh vs 100vh 在 iOS Safari**：
+- `100vh`：等於整個視口高度（含瀏覽器工具列），內容可能被 UI 遮蓋
+- `100dvh`（dynamic viewport height）：動態計算可視區域，瀏覽器 UI 展開/收起時即時更新，是 iOS 的正確解法
+
+**Mobile Modal 黃金模式**：
+```tsx
+// Modal 容器: flex col + max-h
+<div className="flex flex-col" style={{ maxHeight: '90dvh' }}>
+  <div className="shrink-0"> {/* header：不縮放 */}
+  <div className="overflow-y-auto flex-1"> {/* body：可捲動 */}
+  <div className="shrink-0"> {/* footer：不縮放，永遠可見 */}
+```
+確保 footer 按鈕在任何螢幕高度都可操作。
+
+**PWA 在 iOS 的限制**：
+- `display: standalone` 搭配 `apple-mobile-web-app-capable` 才能全螢幕
+- `status-bar-style: black-translucent` + `viewport-fit: cover` 可讓內容延伸到瀏海下方
+- 需要 `apple-touch-icon`（180×180）才能在主畫面顯示正確圖示
+
+*最後更新：2026-03-14 22:00 CST*
