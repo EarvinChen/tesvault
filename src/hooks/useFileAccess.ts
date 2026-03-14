@@ -46,6 +46,10 @@ export interface UseFileAccessReturn {
   handleDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
   handleDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
   handleDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  /** The ref that must be attached to the hidden <input> rendered by the caller. */
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  /** onChange handler for the hidden <input>. */
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export function useFileAccess(): UseFileAccessReturn {
@@ -155,6 +159,8 @@ export function useFileAccess(): UseFileAccessReturn {
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    fileInputRef,       // expose so the caller can attach it to the hidden <input>
+    handleInputChange,  // expose so the caller can wire onChange
   };
 }
 

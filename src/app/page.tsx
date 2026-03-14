@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFileAccess, FileInputFallback, isIOS } from '@/hooks/useFileAccess';
 import { useEventStore } from '@/stores/event-store';
@@ -8,7 +8,6 @@ import { useEventStore } from '@/stores/event-store';
 export default function LandingPage() {
   const router = useRouter();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const ios = typeof navigator !== 'undefined' ? isIOS() : false;
 
   const {
@@ -16,6 +15,8 @@ export default function LandingPage() {
     handleDragOver: hookDragOver,
     handleDragLeave: hookDragLeave,
     handleDrop: hookDrop,
+    fileInputRef,          // ← hook's ref, shared with FileInputFallback
+    handleInputChange: hookHandleInputChange,
   } = useFileAccess();
 
   const navigateIfLoaded = () => {
@@ -46,13 +47,9 @@ export default function LandingPage() {
     navigateIfLoaded();
   };
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      await useEventStore.getState().loadFolder(files);
-      navigateIfLoaded();
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    hookHandleInputChange(e);  // loads files via hook (wraps with iOS path if needed)
+    navigateIfLoaded();
   };
 
   const handleSelectClick = async () => {
