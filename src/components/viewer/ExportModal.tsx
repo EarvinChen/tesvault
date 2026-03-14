@@ -241,9 +241,13 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      style={{
+        paddingLeft:  'max(1rem, env(safe-area-inset-left))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right))',
+      }}
       onClick={(e) => { if (e.target === e.currentTarget && !isExporting) onClose(); }}
     >
-      <div className="relative w-full max-w-md mx-4 rounded-2xl bg-[#141414] border border-[#2a2a2a] shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-md rounded-2xl bg-[#141414] border border-[#2a2a2a] shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a]">
