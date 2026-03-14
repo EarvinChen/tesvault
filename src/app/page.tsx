@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFileAccess, FileInputFallback, isIOS } from '@/hooks/useFileAccess';
 import { useEventStore } from '@/stores/event-store';
@@ -15,17 +15,21 @@ export default function LandingPage() {
     handleDragOver: hookDragOver,
     handleDragLeave: hookDragLeave,
     handleDrop: hookDrop,
-    fileInputRef,          // ← hook's ref, shared with FileInputFallback
-    handleInputChange: hookHandleInputChange,
+    fileInputRef,
+    handleInputChange,
   } = useFileAccess();
 
-  const navigateIfLoaded = () => {
-    setTimeout(() => {
-      if (useEventStore.getState().events.length > 0) {
-        router.push('/viewer');
-      }
-    }, 500);
-  };
+  // Subscribe to store — navigate as soon as loading is done and events exist.
+  // This replaces the unreliable 500 ms setTimeout which fires before iOS USB
+  // I/O completes, leaving the user stuck on the landing page.
+  const isLoading = useEventStore((s) => s.isLoading);
+  const events    = useEventStore((s) => s.events);
+
+  useEffect(() => {
+    if (!isLoading && events.length > 0) {
+      router.push('/viewer');
+    }
+  }, [isLoading, events.length, router]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -44,21 +48,10 @@ export default function LandingPage() {
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     setIsDraggingOver(false);
     await hookDrop(e);
-    navigateIfLoaded();
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    hookHandleInputChange(e);  // loads files via hook (wraps with iOS path if needed)
-    navigateIfLoaded();
-  };
-
-  const handleSelectClick = async () => {
-    await openFolder();
-    navigateIfLoaded();
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4">
+    <div className="min-h-[100dvh] bg-[#0a0a0a] flex flex-col items-center justify-center px-4 safe-bottom">
       <FileInputFallback
         fileInputRef={fileInputRef}
         handleInputChange={handleInputChange}
@@ -75,12 +68,8 @@ export default function LandingPage() {
 
         {/* Title and subtitle */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-semibold text-[#e5e5e5] mb-2">
-            Tesla 行車記錄器 Web 播放器
-          </h2>
-          <p className="text-lg text-[#a0a0a0]">
-            免安裝・六鏡頭同步・瀏覽器直接開
-          </p>
+          <h2 className="text-3xl font-semibold text-[#e5e5e5] mb-2">Tesla 行車記錄器 Web 播放器</h2>
+          <p className="text-lg text-[#a0a0a0]">免安裝・六鏡頭同步・瀏覽器直接開</p>
         </div>
 
         {/* iOS notice */}
@@ -96,16 +85,25 @@ export default function LandingPage() {
           </div>
         )}
 
+        {/* Loading state */}
+        {isLoading && (
+          <div className="mb-6 flex items-center justify-center gap-3 p-4 rounded-xl bg-[#141414] border border-[#2a2a2a]">
+            <svg className="w-5 h-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+            <span className="text-sm text-[#aaa]">讀取中，請稍候…</span>
+          </div>
+        )}
+
         {/* Drop zone */}
         <div
-          className={`w-full p-12 rounded-xl border-2 border-dashed transition-all mb-8 select-none ${
-            ios ? 'cursor-pointer' : 'cursor-pointer'
-          } ${
+          className={`w-full p-12 rounded-xl border-2 border-dashed transition-all mb-8 cursor-pointer select-none ${
             isDraggingOver
               ? 'border-blue-500 bg-blue-500/10'
               : 'border-[#2a2a2a] bg-[#141414] hover:border-blue-500/60 hover:bg-blue-500/5'
           }`}
-          onClick={handleSelectClick}
+          onClick={() => !isLoading && openFolder()}
           onDragOver={ios ? undefined : handleDragOver}
           onDragLeave={ios ? undefined : handleDragLeave}
           onDrop={ios ? undefined : handleDrop}
@@ -113,16 +111,10 @@ export default function LandingPage() {
           <div className="text-center pointer-events-none">
             <svg
               className={`w-12 h-12 mx-auto mb-4 transition-colors ${isDraggingOver ? 'text-blue-400' : 'text-[#a0a0a0]'}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             {ios ? (
               <>
@@ -141,10 +133,11 @@ export default function LandingPage() {
         {/* Select button */}
         <div className="flex justify-center mb-12">
           <button
-            onClick={handleSelectClick}
-            className="px-8 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors text-white font-semibold"
+            onClick={() => !isLoading && openFolder()}
+            disabled={isLoading}
+            className="px-8 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-50 transition-colors text-white font-semibold"
           >
-            {ios ? '選擇 TeslaCam 影片檔案' : '選擇 TeslaCam 資料夾'}
+            {isLoading ? '讀取中…' : ios ? '選擇 TeslaCam 影片檔案' : '選擇 TeslaCam 資料夾'}
           </button>
         </div>
 
@@ -156,10 +149,7 @@ export default function LandingPage() {
             { icon: '🌙', title: '深色主題', description: '專為夜間駕駛影片優化' },
             { icon: '⌨️', title: '鍵盤快捷鍵', description: '快速控制播放和調整設定' },
           ].map((feature, i) => (
-            <div
-              key={i}
-              className="p-4 rounded-lg bg-[#141414] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors"
-            >
+            <div key={i} className="p-4 rounded-lg bg-[#141414] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors">
               <div className="text-2xl mb-2">{feature.icon}</div>
               <h3 className="text-[#e5e5e5] font-semibold mb-1">{feature.title}</h3>
               <p className="text-sm text-[#a0a0a0]">{feature.description}</p>

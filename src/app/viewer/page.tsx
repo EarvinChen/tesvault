@@ -34,7 +34,7 @@ export default function ViewerPage() {
   }, [currentEvent]);
 
   return (
-    <div className="w-screen h-screen overflow-hidden bg-[#0a0a0a] flex flex-col pt-14">
+    <div className="w-screen overflow-hidden bg-[#0a0a0a] flex flex-col pt-14" style={{ height: '100dvh' }}>
 
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
 

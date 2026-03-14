@@ -128,64 +128,72 @@ function buildFileIndex(files: File[]): Map<string, File> {
 /**
  * For saved/sentry events: read event.json and generate thumbnailUrl.
  * For all events: noop (returns event unchanged).
+ *
+ * Processes at most CONCURRENCY events at a time to avoid overwhelming
+ * iOS USB I/O when there are dozens of sentry events.
  */
+const ENRICH_CONCURRENCY = 4;
+
 async function enrichEvents(
   events: TeslaCamEvent[],
   allFiles: File[]
 ): Promise<TeslaCamEvent[]> {
   const fileIndex = buildFileIndex(allFiles);
 
-  return Promise.all(
-    events.map(async (ev) => {
-      if (ev.type === 'recent') return ev;
+  async function enrichOne(ev: TeslaCamEvent): Promise<TeslaCamEvent> {
+    if (ev.type === 'recent') return ev;
 
-      // Find the event.json file for this folder
-      const enriched = { ...ev };
+    const enriched = { ...ev };
 
-      // Look for event.json using folder name pattern
-      for (const [path, file] of fileIndex) {
-        if (path.includes(ev.folderName) && path.endsWith('event.json')) {
-          try {
-            const text = await file.text();
-            const json = JSON.parse(text);
+    // Look for event.json
+    for (const [path, file] of fileIndex) {
+      if (path.includes(ev.folderName) && path.endsWith('event.json')) {
+        try {
+          const text = await file.text();
+          const json = JSON.parse(text);
 
-            // GPS location
-            const lat = parseFloat(json.est_lat);
-            const lon = parseFloat(json.est_lon);
-            if (!isNaN(lat) && !isNaN(lon)) {
-              enriched.location = {
-                lat,
-                lon,
-                street: json.street || undefined,
-                city:   json.city   || undefined,
-              };
-            }
-
-            // Sentry trigger reason
-            if (ev.type === 'sentry' && json.reason) {
-              const r: string = json.reason;
-              if (r.includes('motion'))    enriched.sentryTrigger = 'motion';
-              else if (r.includes('impact')) enriched.sentryTrigger = 'impact';
-              else if (r.includes('glass'))  enriched.sentryTrigger = 'glass_break';
-              else if (r.includes('proximity')) enriched.sentryTrigger = 'proximity';
-              else enriched.sentryTrigger = 'unknown';
-            }
-          } catch {
-            // ignore malformed event.json
+          const lat = parseFloat(json.est_lat);
+          const lon = parseFloat(json.est_lon);
+          if (!isNaN(lat) && !isNaN(lon)) {
+            enriched.location = {
+              lat,
+              lon,
+              street: json.street || undefined,
+              city:   json.city   || undefined,
+            };
           }
-          break;
-        }
-      }
 
-      // Generate thumbnail URL from thumb.png
-      for (const [path, file] of fileIndex) {
-        if (path.includes(ev.folderName) && path.endsWith('thumb.png')) {
-          enriched.thumbnailUrl = URL.createObjectURL(file);
-          break;
+          if (ev.type === 'sentry' && json.reason) {
+            const r: string = json.reason;
+            if (r.includes('motion'))         enriched.sentryTrigger = 'motion';
+            else if (r.includes('impact'))    enriched.sentryTrigger = 'impact';
+            else if (r.includes('glass'))     enriched.sentryTrigger = 'glass_break';
+            else if (r.includes('proximity')) enriched.sentryTrigger = 'proximity';
+            else                              enriched.sentryTrigger = 'unknown';
+          }
+        } catch {
+          // ignore malformed event.json
         }
+        break;
       }
+    }
 
-      return enriched;
-    })
-  );
+    // Generate thumbnail URL from thumb.png
+    for (const [path, file] of fileIndex) {
+      if (path.includes(ev.folderName) && path.endsWith('thumb.png')) {
+        enriched.thumbnailUrl = URL.createObjectURL(file);
+        break;
+      }
+    }
+
+    return enriched;
+  }
+
+  // Process in batches of ENRICH_CONCURRENCY to throttle concurrent USB reads.
+  const results: TeslaCamEvent[] = [];
+  for (let i = 0; i < events.length; i += ENRICH_CONCURRENCY) {
+    const batch = await Promise.all(events.slice(i, i + ENRICH_CONCURRENCY).map(enrichOne));
+    results.push(...batch);
+  }
+  return results;
 }

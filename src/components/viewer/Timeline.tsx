@@ -46,7 +46,7 @@ export function Timeline() {
   };
 
   return (
-    <div className="w-full px-4 py-2 bg-[#0a0a0a] border-b border-[#2a2a2a] space-y-2">
+    <div className="w-full px-4 pt-2 bg-[#0a0a0a] border-b border-[#2a2a2a] space-y-2" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
       {/* Progress slider spanning the full estimated event duration */}
       <input
         type="range"

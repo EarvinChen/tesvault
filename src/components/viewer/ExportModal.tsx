@@ -93,6 +93,13 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
   const useHardwareEncoder = useMemo(() => isCanvasExportSupported(), []);
   const PHASE_LABELS = useHardwareEncoder ? PHASE_LABELS_HW : PHASE_LABELS_SW;
 
+  // iOS hardware decoder limit: simultaneous H.264 decode sessions are capped
+  // (typically 2–4). Six-camera export saturates this, causing some feeds to freeze.
+  const iosMultiCamWarning =
+    typeof navigator !== 'undefined' &&
+    /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+    autoLayout !== 'single';
+
   // ── Compute global (cross-clip) total duration ───────────────────────────
   // Use actual clipDurations where known, otherwise estimate 60 s per clip
   const totalClips = currentEvent?.clips.length ?? 1;
@@ -342,6 +349,14 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
               </div>
             </div>
           </div>
+
+          {/* iOS multi-camera warning */}
+          {iosMultiCamWarning && !isExporting && (
+            <div className="text-xs text-orange-400/90 bg-orange-900/15 rounded-lg px-3 py-2 leading-relaxed">
+              📱 iPhone/iPad 的硬體解碼器數量有限，多鏡頭同時播放可能導致部分畫面凍結。
+              建議切換到<span className="font-semibold text-orange-300"> 單鏡頭模式</span>（點擊任一鏡頭放大後再匯出）以獲得最佳效果。
+            </div>
+          )}
 
           {/* Soft-limit warning */}
           {overSoftLimit && !isExporting && (

@@ -25,7 +25,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          height: 'calc(100vh - 3.5rem)', // Account for header height
+          height: 'calc(100dvh - 3.5rem)', // 100dvh: dynamic viewport (Safari safe)
         }}
       >
         <EventList />
