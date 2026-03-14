@@ -247,10 +247,10 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
       }}
       onClick={(e) => { if (e.target === e.currentTarget && !isExporting) onClose(); }}
     >
-      <div className="relative w-full max-w-md rounded-2xl bg-[#141414] border border-[#2a2a2a] shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-md rounded-2xl bg-[#141414] border border-[#2a2a2a] shadow-2xl flex flex-col" style={{ maxHeight: '90dvh' }}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a]">
+        {/* Header — fixed, never scrolls */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a] shrink-0">
           <h2 className="text-[#e5e5e5] font-semibold text-base">匯出影片</h2>
           <button
             onClick={onClose}
@@ -264,8 +264,8 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5">
+        {/* Body — scrollable on small screens */}
+        <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 overscroll-contain">
 
           {/* Event info */}
           {currentEvent && (
@@ -382,8 +382,8 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 pb-5 space-y-3">
+        {/* Footer — fixed, never scrolls, respects home indicator */}
+        <div className="px-6 pt-2 space-y-3 border-t border-[#2a2a2a] shrink-0" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
 
           {/* Progress */}
           {isExporting && (
