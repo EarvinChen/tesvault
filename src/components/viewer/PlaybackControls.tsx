@@ -138,8 +138,8 @@ export function PlaybackControls() {
               </button>
 
               {/* Clip indicator */}
-              <span className="text-xs text-[#a0a0a0] font-medium min-w-[56px] text-center">
-                片段 {activeClipIndex + 1}/{totalClips}
+              <span className="text-xs text-[#a0a0a0] font-medium min-w-[32px] text-center">
+                {activeClipIndex + 1}/{totalClips}
               </span>
 
               {/* Next clip */}
