@@ -193,3 +193,96 @@ estimatedTotal = sum of (clipDurations[i] ?? 60) for all clips
 ---
 
 *最後更新：2026-03-12 18:30 CST*
+
+---
+
+## 2026-03-14（週六）
+
+**開發者**：Claude（PM + 測試經理 + 程式設計師三合一）
+**今日重點**：上線 Vercel、iOS 相容性修復
+
+---
+
+### 上午 — 上線準備
+
+**技術棧確認**：
+- GitHub Pages 排除（需 Node.js 伺服器，靜態匯出有限制）
+- 選定 **Vercel**（Next.js 官方平台，零設定，push 自動部署）
+
+**工具鏈建立（使用者操作）**：
+1. 安裝 Homebrew（`/opt/homebrew`，ARM64 Apple Silicon）
+2. 安裝 `gh` CLI（GitHub 官方命令列工具）
+3. `gh auth login`（瀏覽器 OAuth，免密碼）
+4. `gh repo create tesvault --public --source=. --remote=origin --push`（一行建 repo + push）
+5. Vercel 連接 GitHub repo，自動偵測 Next.js，部署成功
+
+**Vercel MCP**：已連線（`team_I4dmO20RbNiV9OvZedpOi47N`），後續可用 MCP 查看部署狀態。
+
+---
+
+### 下午 — iOS 相容性（三輪修復）
+
+**問題發現**：部署上線後，iOS 無法選擇 TeslaCam 資料夾。
+
+#### Bug 1 — iOS 完全不支援資料夾選取
+
+iOS Safari 同時不支援：
+- `window.showDirectoryPicker()`（File System Access API）
+- `<input webkitdirectory>`（資料夾選取屬性，iOS 靜默忽略）
+
+**修復方案**（commit `01458b2`）：
+- 新增 `isIOS()` 偵測函式（含 iPad OS 13+ 偽裝 macOS 的判斷）
+- iOS 改用 `<input multiple accept="video/mp4,video/*">`
+- `processFiles()` 對 iOS 檔案自動加 `RecentClips/` 路徑前綴（`wrapWithFlatPath()`），讓 parser 無需修改即可正常分類
+- Landing page 加藍色說明卡片（USB 轉接頭操作指引），按鈕文字改為「選擇影片檔案」
+
+#### Bug 2 — iOS 點擊沒有反應（fileInputRef 斷開）
+
+**根因**（同樣問題出現在 `page.tsx` 和 `Header.tsx`）：
+
+`useFileAccess` Hook 內部維護自己的 `fileInputRef`，但 `page.tsx` 和 `Header.tsx` 各自用 `useRef(null)` 建立獨立的 ref 傳給 `FileInputFallback`。`openFolder()` 呼叫 Hook 內部的 ref `.click()`，而該 ref 從未掛載任何 DOM 元素，永遠是 null。
+
+桌面不受影響的原因：`showDirectoryPicker` 成功，根本不走 ref 路徑。iOS 沒有 `showDirectoryPicker`，只能走 fallback，點了空氣。
+
+**修復**（commit `73677c6`）：
+- `UseFileAccessReturn` 新增 `fileInputRef` 和 `handleInputChange`
+- `page.tsx` 改用 Hook 回傳的 ref，刪除自建的 `useRef`
+
+#### Bug 3 — Header「選擇資料夾」按鈕在 iOS 仍失效
+
+`Header.tsx` 有完全相同的 ref 斷開問題，額外還有：`handleInputChange` 選完檔案後呼叫的是 `openFolder()` 而非載入檔案，雙重 bug。
+
+**修復**（commit `ba711f4`）：
+- 同樣改用 Hook 回傳的 `fileInputRef` 和 `handleInputChange`
+- iOS 按鈕標籤改為「選擇影片」
+- 拖放事件在 iOS 停用（觸控裝置無意義）
+
+---
+
+### 今日 Commit 記錄
+
+| Commit | 描述 |
+|--------|------|
+| `01458b2` | feat: iOS support for file selection |
+| `73677c6` | fix: iOS tap does nothing — hook fileInputRef disconnected |
+| `ba711f4` | fix: Header had same disconnected fileInputRef bug |
+
+---
+
+### 技術學習筆記
+
+**iOS Safari 的資料夾存取限制**：
+- `webkitdirectory`：屬性存在但靜默忽略，不會報錯，只是選檔視窗不顯示
+- `showDirectoryPicker()`：完全未實作
+- 唯一可行方案：`<input multiple>` 選多個個別檔案，再用 filename pattern 重建結構
+
+**iPad OS 13+ 偽裝問題**：
+- iPad OS 13 起 userAgent 改為 macOS 格式（避免被誤判為手機）
+- 偵測方式：`navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1`
+
+**React Hook ref 與 DOM 元素的連結問題**：
+- `useRef` 只是一個可變物件（`{ current: null }`），必須透過 `ref={...}` 屬性實際掛載到 DOM 元素才有值
+- Hook 回傳的 ref 若不在 return 值中暴露，使用方無法得知它的存在，各自建立新的 ref 就會造成斷開
+- 教訓：包含 ref 的 Hook，應將 ref 納入 return type，確保使用方和 Hook 共用同一個實例
+
+*最後更新：2026-03-14 17:00 CST*
