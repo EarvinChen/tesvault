@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Force clean build — bypass stale CDN cache
+  generateBuildId: async () => `build-${Date.now()}`,
   async headers() {
     return [
       {
