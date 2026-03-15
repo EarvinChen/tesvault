@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { LanguageProvider } from "@/i18n/LanguageContext";
+import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
   title: {
@@ -81,9 +81,9 @@ export default function RootLayout({
   return (
     <html lang="zh-TW" className="dark">
       <body className="antialiased bg-[#0a0a0a] text-[#e5e5e5]">
-        <LanguageProvider>
+        <Providers>
           {children}
-        </LanguageProvider>
+        </Providers>
       </body>
     </html>
   );
