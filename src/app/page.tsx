@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFileAccess, FileInputFallback, isIOS } from '@/hooks/useFileAccess';
 import { useEventStore } from '@/stores/event-store';
+import { useLanguage } from '@/i18n/LanguageContext';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export default function LandingPage() {
   const router = useRouter();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const ios = typeof navigator !== 'undefined' ? isIOS() : false;
+  const { t } = useLanguage();
 
   const {
     openFolder,
@@ -64,23 +67,24 @@ export default function LandingPage() {
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-13c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5z" />
           </svg>
           <h1 className="text-4xl font-bold text-[#e5e5e5]">TesVault</h1>
+          <LanguageSwitcher />
         </div>
 
         {/* Title and subtitle */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-semibold text-[#e5e5e5] mb-2">Tesla 行車記錄器 Web 播放器</h2>
-          <p className="text-lg text-[#a0a0a0]">免安裝・六鏡頭同步・瀏覽器直接開</p>
+          <h2 className="text-3xl font-semibold text-[#e5e5e5] mb-2">{t('landing.title')}</h2>
+          <p className="text-lg text-[#a0a0a0]">{t('landing.subtitle')}</p>
         </div>
 
         {/* iOS notice */}
         {ios && (
           <div className="mb-6 p-4 rounded-xl bg-blue-900/20 border border-blue-500/30 text-sm text-[#aaa] leading-relaxed">
-            <p className="text-blue-400 font-semibold mb-1">📱 iOS 操作說明</p>
+            <p className="text-blue-400 font-semibold mb-1">{t('ios.title')}</p>
             <p>
-              將 Tesla USB 隨身碟透過轉接頭接上 iPhone，
-              打開「<span className="text-[#e5e5e5]">檔案 App</span>」，
-              進入 <span className="text-[#e5e5e5]">TeslaCam → RecentClips</span>（或 SavedClips / SentryClips 裡的事件資料夾），
-              長按選取全部 mp4 影片後，點下方的按鈕選擇即可。
+              {t('ios.step1')}，
+              {t('ios.step2')}，
+              {t('ios.step3')}（或 SavedClips / SentryClips 裡的事件資料夾），
+              {t('ios.step4')}。
             </p>
           </div>
         )}
@@ -118,13 +122,13 @@ export default function LandingPage() {
             </svg>
             {ios ? (
               <>
-                <p className="text-[#e5e5e5] font-medium mb-2">點擊選擇影片檔案</p>
-                <p className="text-sm text-[#a0a0a0]">從「檔案 App」選取 TeslaCam mp4 影片</p>
+                <p className="text-[#e5e5e5] font-medium mb-2">{t('landing.cta.ios')}</p>
+                <p className="text-sm text-[#a0a0a0]">{t('ios.step3')}</p>
               </>
             ) : (
               <>
-                <p className="text-[#e5e5e5] font-medium mb-2">拖放 TeslaCam 資料夾到此處</p>
-                <p className="text-sm text-[#a0a0a0]">或點擊此處選擇資料夾</p>
+                <p className="text-[#e5e5e5] font-medium mb-2">{t('landing.cta.dragDrop')}</p>
+                <p className="text-sm text-[#a0a0a0]">{t('landing.cta.clickToSelect')}</p>
               </>
             )}
           </div>
@@ -137,22 +141,22 @@ export default function LandingPage() {
             disabled={isLoading}
             className="px-8 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-50 transition-colors text-white font-semibold"
           >
-            {isLoading ? '讀取中…' : ios ? '選擇 TeslaCam 影片檔案' : '選擇 TeslaCam 資料夾'}
+            {isLoading ? t('landing.loading') : ios ? t('landing.cta.ios') : t('landing.cta.button')}
           </button>
         </div>
 
         {/* Feature cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
-            { icon: '📹', title: '六鏡頭同步', description: '支援最新 HW4 六鏡頭架構同步播放' },
-            { icon: '⚡', title: '免安裝', description: '瀏覽器直接開，無需下載軟體' },
-            { icon: '🌙', title: '深色主題', description: '專為夜間駕駛影片優化' },
-            { icon: '⌨️', title: '鍵盤快捷鍵', description: '快速控制播放和調整設定' },
+            { icon: '📹', key: 'feature.6camera' },
+            { icon: '⚡', key: 'feature.noInstall' },
+            { icon: '🌙', key: 'feature.darkMode' },
+            { icon: '⌨️', key: 'feature.keyboard' },
           ].map((feature, i) => (
             <div key={i} className="p-4 rounded-lg bg-[#141414] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors">
               <div className="text-2xl mb-2">{feature.icon}</div>
-              <h3 className="text-[#e5e5e5] font-semibold mb-1">{feature.title}</h3>
-              <p className="text-sm text-[#a0a0a0]">{feature.description}</p>
+              <h3 className="text-[#e5e5e5] font-semibold mb-1">{t(feature.key as any)}</h3>
+              <p className="text-sm text-[#a0a0a0]">{t((feature.key + '.desc') as any)}</p>
             </div>
           ))}
         </div>
@@ -160,14 +164,14 @@ export default function LandingPage() {
         {/* Keyboard shortcuts — desktop only */}
         {!ios && (
           <div className="mt-12 p-4 rounded-lg bg-[#141414] border border-[#2a2a2a]">
-            <h3 className="text-[#e5e5e5] font-semibold mb-2">快速鍵提示</h3>
+            <h3 className="text-[#e5e5e5] font-semibold mb-2">{t('shortcut.title')}</h3>
             <div className="grid grid-cols-2 gap-2 text-xs text-[#a0a0a0]">
-              <div><span className="text-blue-500">Space</span> - 播放/暫停</div>
-              <div><span className="text-blue-500">← / →</span> - 快進/快退 5 秒</div>
-              <div><span className="text-blue-500">↑ / ↓</span> - 音量</div>
-              <div><span className="text-blue-500">F</span> - 全螢幕</div>
-              <div><span className="text-blue-500">, / .</span> - 速度</div>
-              <div><span className="text-blue-500">Esc</span> - 返回網格</div>
+              <div><span className="text-blue-500">Space</span> - {t('shortcut.playPause')}</div>
+              <div><span className="text-blue-500">← / →</span> - {t('shortcut.backward')} / {t('shortcut.forward')}</div>
+              <div><span className="text-blue-500">↑ / ↓</span> - {t('shortcut.volume')}</div>
+              <div><span className="text-blue-500">F</span> - {t('shortcut.fullscreen')}</div>
+              <div><span className="text-blue-500">, / .</span> - {t('shortcut.speed')}</div>
+              <div><span className="text-blue-500">Esc</span> - {t('shortcut.exit')}</div>
             </div>
           </div>
         )}
