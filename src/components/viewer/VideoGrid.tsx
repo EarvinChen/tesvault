@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { useViewerStore } from '@/stores/viewer-store';
 import { VideoPlayer } from './VideoPlayer';
 import { ExportModal } from './ExportModal';
@@ -12,6 +13,7 @@ const ALL_CAMERAS: CameraPosition[] = [
 ];
 
 export function VideoGrid() {
+  const { t } = useI18n();
   const currentEvent     = useViewerStore((s) => s.currentEvent);
   const cameraCount      = useViewerStore((s) => s.cameraCount);
   const focusedCamera    = useViewerStore((s) => s.focusedCamera);
@@ -243,7 +245,7 @@ export function VideoGrid() {
   if (!currentEvent) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0a0a0a] min-h-0" data-video-grid>
-        <p className="text-[#e5e5e5] text-lg">請選擇一個事件</p>
+        <p className="text-[#e5e5e5] text-lg">{t('videoGrid.selectEvent')}</p>
       </div>
     );
   }
@@ -276,12 +278,12 @@ export function VideoGrid() {
           <button
             onClick={unfocusCamera}
             className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/60 hover:bg-[#1a1a1a]/90 backdrop-blur-sm border border-[#2a2a2a] text-[#e5e5e5] text-xs font-medium transition-colors"
-            title="返回總覽 (Esc)"
+            title={t('videoGrid.backOverview')}
           >
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 3h8v8H3V3zm0 10h8v8H3v-8zm10-10h8v8h-8V3zm0 10h8v8h-8v-8z" />
             </svg>
-            返回
+            {t('videoGrid.back')}
           </button>
 
         </div>

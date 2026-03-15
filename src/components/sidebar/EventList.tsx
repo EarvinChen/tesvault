@@ -3,17 +3,19 @@
 import React from 'react';
 import { useEventStore } from '@/stores/event-store';
 import { useViewerStore } from '@/stores/viewer-store';
+import { useI18n } from '@/lib/i18n';
 import { EventCard } from './EventCard';
 import type { EventType } from '@/types/tesla';
 
-const FILTER_OPTIONS: Array<{ key: 'all' | EventType; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'recent', label: '最近' },
-  { key: 'saved', label: '保存' },
-  { key: 'sentry', label: '哨兵' },
+const FILTER_OPTIONS: Array<{ key: 'all' | EventType; labelKey: string }> = [
+  { key: 'all', labelKey: 'eventList.all' },
+  { key: 'recent', labelKey: 'eventList.recent' },
+  { key: 'saved', labelKey: 'eventList.saved' },
+  { key: 'sentry', labelKey: 'eventList.sentry' },
 ];
 
 export function EventList() {
+  const { t } = useI18n();
   const events = useEventStore((state) => state.events);
   const activeFilter = useEventStore((state) => state.activeFilter);
   const isLoading = useEventStore((state) => state.isLoading);
@@ -48,7 +50,7 @@ export function EventList() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Filter tabs */}
       <div className="px-3 py-2 border-b border-[#2a2a2a] flex gap-1 overflow-x-auto flex-shrink-0">
-        {FILTER_OPTIONS.map(({ key, label }) => {
+        {FILTER_OPTIONS.map(({ key, labelKey }) => {
           const count =
             key === 'all'
               ? events.length
@@ -64,7 +66,7 @@ export function EventList() {
                   : 'bg-[#1a1a1a] text-[#e5e5e5] hover:bg-[#2a2a2a] border border-[#2a2a2a]'
               }`}
             >
-              {label}
+              {t(labelKey)}
               {count > 0 && <span className="ml-1 text-xs">({count})</span>}
             </button>
           );
@@ -76,7 +78,7 @@ export function EventList() {
         {filteredEvents.length === 0 ? (
           <div className="flex items-center justify-center h-full text-center">
             <div>
-              <p className="text-[#a0a0a0] text-sm">沒有事件</p>
+              <p className="text-[#a0a0a0] text-sm">{t('eventList.empty')}</p>
             </div>
           </div>
         ) : (

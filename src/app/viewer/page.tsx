@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { VideoGrid } from '@/components/viewer/VideoGrid';
@@ -11,6 +12,7 @@ import { useViewerStore } from '@/stores/viewer-store';
 import { useEventStore } from '@/stores/event-store';
 
 export default function ViewerPage() {
+  const { t } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const currentEvent = useViewerStore((state) => state.currentEvent);
   const events = useEventStore((state) => state.events);
@@ -59,19 +61,19 @@ export default function ViewerPage() {
                 >
                   <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z" />
                 </svg>
-                <p className="text-[#e5e5e5] text-lg mb-2">請選擇一個事件</p>
+                <p className="text-[#e5e5e5] text-lg mb-2">{t('viewer.selectEvent')}</p>
 
                 {/* Mobile: tap-to-open button (sidebar is hidden by default on mobile) */}
                 <button
                   onClick={() => setSidebarOpen(true)}
                   className="md:hidden mt-3 px-5 py-2.5 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors text-white text-sm font-medium"
                 >
-                  開啟事件列表
+                  {t('viewer.openList')}
                 </button>
 
                 {/* Desktop: sidebar always visible, just provide a hint */}
                 <p className="hidden md:block text-[#a0a0a0] text-sm mt-1">
-                  在左側邊欄選擇事件開始播放
+                  {t('viewer.hint')}
                 </p>
               </div>
             </div>

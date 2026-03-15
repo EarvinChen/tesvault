@@ -1,6 +1,8 @@
 'use client';
 
 import { useFileAccess, FileInputFallback, isIOS } from '@/hooks/useFileAccess';
+import { useI18n } from '@/lib/i18n';
+import LocaleSwitcher from './LocaleSwitcher';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -17,6 +19,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   } = useFileAccess();
 
   const ios = typeof navigator !== 'undefined' ? isIOS() : false;
+  const { t } = useI18n();
 
   return (
     <>
@@ -55,12 +58,15 @@ export function Header({ onMenuClick }: HeaderProps) {
             </svg>
           </button>
 
+          {/* Locale switcher */}
+          <LocaleSwitcher />
+
           {/* Select folder / files button */}
           <button
             onClick={openFolder}
             className="px-4 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors text-white text-sm font-medium"
           >
-            {ios ? '選擇影片' : '選擇資料夾'}
+            {ios ? t('header.selectVideos') : t('header.selectFolder')}
           </button>
         </div>
       </header>

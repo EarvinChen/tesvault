@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useI18n } from '@/lib/i18n';
 import type { TeslaCamEvent, EventType } from '@/types/tesla';
 import { useEventStore } from '@/stores/event-store';
 
@@ -9,10 +10,10 @@ interface EventCardProps {
   isActive: boolean;
 }
 
-const EVENT_TYPE_LABELS: Record<EventType, string> = {
-  recent: '最近',
-  saved: '保存',
-  sentry: '哨兵',
+const EVENT_TYPE_LABEL_KEYS: Record<EventType, string> = {
+  recent: 'eventCard.recent',
+  saved: 'eventCard.saved',
+  sentry: 'eventCard.sentry',
 };
 
 const EVENT_TYPE_COLORS: Record<EventType, string> = {
@@ -22,6 +23,7 @@ const EVENT_TYPE_COLORS: Record<EventType, string> = {
 };
 
 export function EventCard({ event, isActive }: EventCardProps) {
+  const { t } = useI18n();
   const selectEvent = useEventStore((state) => state.selectEvent);
 
   const handleClick = () => {
@@ -69,7 +71,7 @@ export function EventCard({ event, isActive }: EventCardProps) {
           {/* Type badge + duration */}
           <div className="flex items-center gap-1.5 mb-1">
             <div className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${EVENT_TYPE_COLORS[event.type]}`}>
-              {EVENT_TYPE_LABELS[event.type]}
+              {t(EVENT_TYPE_LABEL_KEYS[event.type])}
             </div>
             <span className="text-xs text-[#666]">⏱ {durationLabel}</span>
           </div>
@@ -81,7 +83,7 @@ export function EventCard({ event, isActive }: EventCardProps) {
 
           {/* Camera count and size */}
           <div className="flex items-center gap-2 mt-1 text-xs text-[#a0a0a0]">
-            <span>📹 {cameraCount} 鏡頭</span>
+            <span>📹 {cameraCount} {t('eventCard.cameras')}</span>
             <span>•</span>
             <span>{sizeFormatted}</span>
           </div>
@@ -89,11 +91,11 @@ export function EventCard({ event, isActive }: EventCardProps) {
 
         {/* Right: indicator */}
         {event.isComplete ? (
-          <div className="flex-shrink-0 text-green-500 text-lg" title="完整">
+          <div className="flex-shrink-0 text-green-500 text-lg" title={t('eventCard.complete')}>
             ✓
           </div>
         ) : (
-          <div className="flex-shrink-0 text-amber-500 text-lg" title="不完整">
+          <div className="flex-shrink-0 text-amber-500 text-lg" title={t('eventCard.incomplete')}>
             ⚠
           </div>
         )}

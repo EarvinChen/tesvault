@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { useViewerStore } from '@/stores/viewer-store';
 
 const PLAYBACK_RATES = [0.25, 0.5, 1, 1.5, 2, 4];
 
 export function PlaybackControls() {
+  const { t } = useI18n();
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
 
   const isPlaying       = useViewerStore((state) => state.isPlaying);
@@ -83,7 +85,7 @@ export function PlaybackControls() {
           <button
             onClick={handleBackward}
             className="p-2 rounded-lg hover:bg-[#1a1a1a] transition-colors text-[#e5e5e5] hover:text-blue-500"
-            title="後退 10 秒"
+            title={t('controls.rewind')}
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
@@ -95,7 +97,7 @@ export function PlaybackControls() {
           <button
             onClick={handlePlayPauseClick}
             className="p-2 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors text-white"
-            title={isPlaying ? '暫停 (空白鍵)' : '播放 (空白鍵)'}
+            title={isPlaying ? t('controls.pause') : t('controls.play')}
           >
             {isPlaying ? (
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -112,7 +114,7 @@ export function PlaybackControls() {
           <button
             onClick={handleForward}
             className="p-2 rounded-lg hover:bg-[#1a1a1a] transition-colors text-[#e5e5e5] hover:text-blue-500"
-            title="前進 10 秒"
+            title={t('controls.forward')}
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" style={{ transform: 'scaleX(-1)' }}>
               <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
@@ -130,7 +132,7 @@ export function PlaybackControls() {
                 onClick={handlePrevClip}
                 disabled={activeClipIndex <= 0}
                 className="p-1.5 rounded-lg hover:bg-[#1a1a1a] transition-colors text-[#e5e5e5] hover:text-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                title="上一片段"
+                title={t('controls.prevClip')}
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
@@ -147,7 +149,7 @@ export function PlaybackControls() {
                 onClick={handleNextClip}
                 disabled={activeClipIndex >= totalClips - 1}
                 className="p-1.5 rounded-lg hover:bg-[#1a1a1a] transition-colors text-[#e5e5e5] hover:text-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                title="下一片段"
+                title={t('controls.nextClip')}
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 4V8z" />
@@ -162,7 +164,7 @@ export function PlaybackControls() {
             <button
               onClick={() => setShowSpeedDropdown(!showSpeedDropdown)}
               className="px-3 py-1 rounded-lg bg-[#1a1a1a] hover:bg-[#2a2a2a] transition-colors text-xs font-medium text-[#e5e5e5] border border-[#2a2a2a]"
-              title="播放速度"
+              title={t('controls.speed')}
             >
               {playbackRate}x
             </button>
@@ -196,20 +198,20 @@ export function PlaybackControls() {
           <button
             onClick={openExportModal}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 active:bg-blue-700 transition-colors text-white text-xs font-semibold"
-            title="匯出影片"
+            title={t('controls.exportVideo')}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            匯出
+            {t('controls.export')}
           </button>
 
           {/* Fullscreen */}
           <button
             onClick={handleFullscreen}
             className="p-2 rounded-lg hover:bg-[#1a1a1a] transition-colors text-[#e5e5e5] hover:text-blue-500"
-            title="全螢幕 (F)"
+            title={t('controls.fullscreen')}
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />

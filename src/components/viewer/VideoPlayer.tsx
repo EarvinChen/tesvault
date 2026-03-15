@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useI18n } from '@/lib/i18n';
 import { getCameraLabel } from '@/lib/tesla/camera-config';
 import type { CameraPosition } from '@/types/tesla';
 import { useViewerStore } from '@/stores/viewer-store';
@@ -30,6 +31,7 @@ export function VideoPlayer({
   onLoadedMetadata,
   onEnded,
 }: VideoPlayerProps) {
+  const { t } = useI18n();
   const focusCamera   = useViewerStore((state) => state.focusCamera);
   const unfocusCamera = useViewerStore((state) => state.unfocusCamera);
 
@@ -80,7 +82,7 @@ export function VideoPlayer({
               <svg className="w-4 h-4 text-[#e5e5e5]" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
               </svg>
-              <span className="text-sm text-[#e5e5e5]">縮小</span>
+              <span className="text-sm text-[#e5e5e5]">{t('videoGrid.shrink')}</span>
             </div>
           ) : (
             // Normal camera: hint that clicking enlarges it
@@ -88,7 +90,7 @@ export function VideoPlayer({
               <svg className="w-4 h-4 text-[#e5e5e5]" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
               </svg>
-              <span className="text-sm text-[#e5e5e5]">放大 ({cameraLabelEn})</span>
+              <span className="text-sm text-[#e5e5e5]">{t('videoGrid.enlarge')} ({cameraLabelEn})</span>
             </div>
           )}
         </div>

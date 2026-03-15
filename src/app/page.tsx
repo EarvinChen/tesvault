@@ -4,14 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFileAccess, FileInputFallback, isIOS } from '@/hooks/useFileAccess';
 import { useEventStore } from '@/stores/event-store';
-import { useLanguage } from '@/i18n/LanguageContext';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useI18n } from '@/lib/i18n';
+import LocaleSwitcher from '@/components/layout/LocaleSwitcher';
 
 export default function LandingPage() {
   const router = useRouter();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const ios = typeof navigator !== 'undefined' ? isIOS() : false;
-  const { t } = useLanguage();
+  const { t } = useI18n();
 
   const {
     openFolder,
@@ -23,8 +23,6 @@ export default function LandingPage() {
   } = useFileAccess();
 
   // Subscribe to store — navigate as soon as loading is done and events exist.
-  // This replaces the unreliable 500 ms setTimeout which fires before iOS USB
-  // I/O completes, leaving the user stuck on the landing page.
   const isLoading = useEventStore((s) => s.isLoading);
   const events    = useEventStore((s) => s.events);
 
@@ -67,24 +65,26 @@ export default function LandingPage() {
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-13c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5z" />
           </svg>
           <h1 className="text-4xl font-bold text-[#e5e5e5]">TesVault</h1>
-          <LanguageSwitcher />
+          <LocaleSwitcher />
         </div>
 
         {/* Title and subtitle */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-semibold text-[#e5e5e5] mb-2">{t('landing.title')}</h2>
-          <p className="text-lg text-[#a0a0a0]">{t('landing.subtitle')}</p>
+          <h2 className="text-3xl font-semibold text-[#e5e5e5] mb-2">{t('landing.headline')}</h2>
+          <p className="text-lg text-[#a0a0a0]">{t('landing.subheadline')}</p>
         </div>
 
         {/* iOS notice */}
         {ios && (
           <div className="mb-6 p-4 rounded-xl bg-blue-900/20 border border-blue-500/30 text-sm text-[#aaa] leading-relaxed">
-            <p className="text-blue-400 font-semibold mb-1">{t('ios.title')}</p>
+            <p className="text-blue-400 font-semibold mb-1">{t('landing.iosTitle')}</p>
             <p>
-              {t('ios.step1')}，
-              {t('ios.step2')}，
-              {t('ios.step3')}（或 SavedClips / SentryClips 裡的事件資料夾），
-              {t('ios.step4')}。
+              {t('landing.iosStep1')}
+              <span className="text-[#e5e5e5]">{t('landing.iosStep1Files')}</span>
+              {' → '}
+              <span className="text-[#e5e5e5]">{t('landing.iosStep1Path')}</span>
+              {'. '}
+              {t('landing.iosStep2')}
             </p>
           </div>
         )}
@@ -96,7 +96,7 @@ export default function LandingPage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
             </svg>
-            <span className="text-sm text-[#aaa]">讀取中，請稍候…</span>
+            <span className="text-sm text-[#aaa]">{t('landing.loading')}</span>
           </div>
         )}
 
@@ -122,13 +122,13 @@ export default function LandingPage() {
             </svg>
             {ios ? (
               <>
-                <p className="text-[#e5e5e5] font-medium mb-2">{t('landing.cta.ios')}</p>
-                <p className="text-sm text-[#a0a0a0]">{t('ios.step3')}</p>
+                <p className="text-[#e5e5e5] font-medium mb-2">{t('landing.iosSelectBtn')}</p>
+                <p className="text-sm text-[#a0a0a0]">{t('landing.iosSelectHint')}</p>
               </>
             ) : (
               <>
-                <p className="text-[#e5e5e5] font-medium mb-2">{t('landing.cta.dragDrop')}</p>
-                <p className="text-sm text-[#a0a0a0]">{t('landing.cta.clickToSelect')}</p>
+                <p className="text-[#e5e5e5] font-medium mb-2">{t('landing.dropHint')}</p>
+                <p className="text-sm text-[#a0a0a0]">{t('landing.dropClickHint')}</p>
               </>
             )}
           </div>
@@ -141,22 +141,22 @@ export default function LandingPage() {
             disabled={isLoading}
             className="px-8 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-50 transition-colors text-white font-semibold"
           >
-            {isLoading ? t('landing.loading') : ios ? t('landing.cta.ios') : t('landing.cta.button')}
+            {isLoading ? t('landing.btnLoading') : ios ? t('landing.btnIos') : t('landing.btnDesktop')}
           </button>
         </div>
 
         {/* Feature cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
-            { icon: '📹', key: 'feature.6camera' },
-            { icon: '⚡', key: 'feature.noInstall' },
-            { icon: '🌙', key: 'feature.darkMode' },
-            { icon: '⌨️', key: 'feature.keyboard' },
+            { icon: '📹', titleKey: 'landing.feat1Title', descKey: 'landing.feat1Desc' },
+            { icon: '⚡', titleKey: 'landing.feat2Title', descKey: 'landing.feat2Desc' },
+            { icon: '🌙', titleKey: 'landing.feat3Title', descKey: 'landing.feat3Desc' },
+            { icon: '⌨️', titleKey: 'landing.feat4Title', descKey: 'landing.feat4Desc' },
           ].map((feature, i) => (
             <div key={i} className="p-4 rounded-lg bg-[#141414] border border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors">
               <div className="text-2xl mb-2">{feature.icon}</div>
-              <h3 className="text-[#e5e5e5] font-semibold mb-1">{t(feature.key as any)}</h3>
-              <p className="text-sm text-[#a0a0a0]">{t((feature.key + '.desc') as any)}</p>
+              <h3 className="text-[#e5e5e5] font-semibold mb-1">{t(feature.titleKey)}</h3>
+              <p className="text-sm text-[#a0a0a0]">{t(feature.descKey)}</p>
             </div>
           ))}
         </div>
@@ -164,14 +164,14 @@ export default function LandingPage() {
         {/* Keyboard shortcuts — desktop only */}
         {!ios && (
           <div className="mt-12 p-4 rounded-lg bg-[#141414] border border-[#2a2a2a]">
-            <h3 className="text-[#e5e5e5] font-semibold mb-2">{t('shortcut.title')}</h3>
+            <h3 className="text-[#e5e5e5] font-semibold mb-2">{t('landing.kbTitle')}</h3>
             <div className="grid grid-cols-2 gap-2 text-xs text-[#a0a0a0]">
-              <div><span className="text-blue-500">Space</span> - {t('shortcut.playPause')}</div>
-              <div><span className="text-blue-500">← / →</span> - {t('shortcut.backward')} / {t('shortcut.forward')}</div>
-              <div><span className="text-blue-500">↑ / ↓</span> - {t('shortcut.volume')}</div>
-              <div><span className="text-blue-500">F</span> - {t('shortcut.fullscreen')}</div>
-              <div><span className="text-blue-500">, / .</span> - {t('shortcut.speed')}</div>
-              <div><span className="text-blue-500">Esc</span> - {t('shortcut.exit')}</div>
+              <div><span className="text-blue-500">Space</span> - {t('landing.kbPlayPause')}</div>
+              <div><span className="text-blue-500">← / →</span> - {t('landing.kbSeek')}</div>
+              <div><span className="text-blue-500">↑ / ↓</span> - {t('landing.kbVolume')}</div>
+              <div><span className="text-blue-500">F</span> - {t('landing.kbFullscreen')}</div>
+              <div><span className="text-blue-500">, / .</span> - {t('landing.kbSpeed')}</div>
+              <div><span className="text-blue-500">Esc</span> - {t('landing.kbGrid')}</div>
             </div>
           </div>
         )}

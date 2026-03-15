@@ -14,43 +14,44 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { exportVideo, type ClipSegment, type ExportLayout, type ExportPhase } from '@/lib/export';
 import { exportVideoCanvas, isCanvasExportSupported } from '@/lib/exportWebCodecs';
 import { useViewerStore } from '@/stores/viewer-store';
 import type { CameraPosition } from '@/types/tesla';
 
-// ─── Camera display names ──────────────────────────────────────────────────────
-const CAM_LABELS: Record<CameraPosition, string> = {
-  front:       '前',
-  back:        '後',
-  left_front:  '左前',
-  right_front: '右前',
-  left_rear:   '左後',
-  right_rear:  '右後',
+// ─── Camera display names (key mappings) ──────────────────────────────────────
+const CAM_LABEL_KEYS: Record<CameraPosition, string> = {
+  front:       'cam.front',
+  back:        'cam.back',
+  left_front:  'cam.leftFront',
+  right_front: 'cam.rightFront',
+  left_rear:   'cam.leftRear',
+  right_rear:  'cam.rightRear',
 };
 
-const LAYOUT_LABELS: Record<ExportLayout, string> = {
-  single: '單鏡頭',
-  quad:   '四宮格',
-  six:    '六宮格',
+const LAYOUT_LABEL_KEYS: Record<ExportLayout, string> = {
+  single: 'export.layoutSingle',
+  quad:   'export.layoutQuad',
+  six:    'export.layoutHex',
 };
 
-// Phase labels for the hardware (canvas) encoder path
-const PHASE_LABELS_HW: Record<ExportPhase, string> = {
-  loading_ffmpeg: '準備中…',
-  preparing:      '讀取影片檔案…',
-  encoding:       '硬體加速編碼中…',
-  done:           '完成',
-  error:          '發生錯誤',
+// Phase labels for the hardware (canvas) encoder path (key mappings)
+const PHASE_LABELS_HW_KEYS: Record<ExportPhase, string> = {
+  loading_ffmpeg: 'phase.wc.prepare',
+  preparing:      'phase.wc.decode',
+  encoding:       'phase.wc.encode',
+  done:           'phase.wc.done',
+  error:          'phase.wc.error',
 };
 
-// Phase labels for the FFmpeg.wasm fallback path
-const PHASE_LABELS_SW: Record<ExportPhase, string> = {
-  loading_ffmpeg: '載入 FFmpeg.wasm（首次約 30 MB）…',
-  preparing:      '讀取影片檔案…',
-  encoding:       '編碼中（H.264）…',
-  done:           '完成',
-  error:          '發生錯誤',
+// Phase labels for the FFmpeg.wasm fallback path (key mappings)
+const PHASE_LABELS_SW_KEYS: Record<ExportPhase, string> = {
+  loading_ffmpeg: 'phase.ff.load',
+  preparing:      'phase.ff.read',
+  encoding:       'phase.ff.encode',
+  done:           'phase.ff.done',
+  error:          'phase.ff.error',
 };
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -72,6 +73,8 @@ const SOFT_LIMIT = 180; // 3 minutes
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
+  const { t } = useI18n();
+
   const duration      = useViewerStore((s) => s.duration);
   const clipOffset    = useViewerStore((s) => s.clipOffset);
   const clipDurations = useViewerStore((s) => s.clipDurations);
@@ -91,7 +94,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
 
   // ── Capability detection ─────────────────────────────────────────────────
   const useHardwareEncoder = useMemo(() => isCanvasExportSupported(), []);
-  const PHASE_LABELS = useHardwareEncoder ? PHASE_LABELS_HW : PHASE_LABELS_SW;
+  const PHASE_LABEL_KEYS = useHardwareEncoder ? PHASE_LABELS_HW_KEYS : PHASE_LABELS_SW_KEYS;
 
   // iOS hardware decoder limit: simultaneous H.264 decode sessions are capped
   // (typically 2–4). Six-camera export saturates this, causing some feeds to freeze.
@@ -251,12 +254,12 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
 
         {/* Header — fixed, never scrolls */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a2a] shrink-0">
-          <h2 className="text-[#e5e5e5] font-semibold text-base">匯出影片</h2>
+          <h2 className="text-[#e5e5e5] font-semibold text-base">{t('export.title')}</h2>
           <button
             onClick={onClose}
             disabled={isExporting}
             className="text-[#666] hover:text-[#e5e5e5] disabled:opacity-30 transition-colors"
-            aria-label="關閉"
+            aria-label={t('export.close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -270,9 +273,9 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
           {/* Event info */}
           {currentEvent && (
             <div className="text-xs text-[#666] bg-[#1a1a1a] rounded-lg px-3 py-2">
-              {currentEvent.id}&nbsp;·&nbsp;總長 {fmtTime(estimatedTotal)}
+              {currentEvent.id}&nbsp;·&nbsp;{t('export.totalLength')} {fmtTime(estimatedTotal)}
               {totalClips > 1 && (
-                <span className="ml-1 text-[#444]">（{totalClips} 片段）</span>
+                <span className="ml-1 text-[#444]">（{totalClips} {t('export.segments')}）</span>
               )}
             </div>
           )}
@@ -284,9 +287,9 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                 d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
             </svg>
             <div className="text-xs text-[#aaa]">
-              <span className="text-[#e5e5e5] font-medium">匯出模式：{LAYOUT_LABELS[autoLayout]}</span>
+              <span className="text-[#e5e5e5] font-medium">{t('export.layoutLabel')}：{t(LAYOUT_LABEL_KEYS[autoLayout])}</span>
               {autoLayout === 'single' && (
-                <span className="ml-1 text-blue-400">（{CAM_LABELS[autoSingleCam]}鏡頭）</span>
+                <span className="ml-1 text-blue-400">（{t(CAM_LABEL_KEYS[autoSingleCam])}{t('export.camera')}）</span>
               )}
             </div>
           </div>
@@ -294,14 +297,14 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
           {/* Time range — uses global time across all clips */}
           <div>
             <label className="block text-xs text-[#888] mb-2">
-              時間範圍
+              {t('export.timeRange')}
               <span className="ml-1 text-[#555]">
                 {fmtTime(startTime)} → {fmtTime(endTime)}（{fmtTime(exportDuration)}）
               </span>
             </label>
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <span className="text-xs text-[#666] w-8 shrink-0">開始</span>
+                <span className="text-xs text-[#666] w-8 shrink-0">{t('export.start')}</span>
                 <input type="range" min={0} max={estimatedTotal} step={0.5} value={startTime}
                   disabled={isExporting}
                   onChange={(e) => {
@@ -315,7 +318,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                 <span className="text-xs text-[#aaa] w-10 text-right shrink-0">{fmtTime(startTime)}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-[#666] w-8 shrink-0">結束</span>
+                <span className="text-xs text-[#666] w-8 shrink-0">{t('export.end')}</span>
                 <input type="range" min={0} max={estimatedTotal} step={0.5} value={endTime}
                   disabled={isExporting}
                   onChange={(e) => {
@@ -334,7 +337,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                     setEndTime(Math.min(estimatedTotal, SOFT_LIMIT));
                   }}
                   className="text-xs text-[#666] hover:text-[#aaa] disabled:opacity-40">
-                  全片段（最多 3 分鐘）
+                  {t('export.allSegments')}
                 </button>
                 {globalCurrentTime > 0 && globalCurrentTime < estimatedTotal && (
                   <>
@@ -346,7 +349,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                         setEndTime(Math.min(estimatedTotal, s + 30));
                       }}
                       className="text-xs text-[#666] hover:text-[#aaa] disabled:opacity-40">
-                      目前位置前後 15 秒
+                      {t('export.around15s')}
                     </button>
                   </>
                 )}
@@ -357,27 +360,27 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
           {/* iOS multi-camera warning */}
           {iosMultiCamWarning && !isExporting && (
             <div className="text-xs text-orange-400/90 bg-orange-900/15 rounded-lg px-3 py-2 leading-relaxed">
-              📱 iPhone/iPad 的硬體解碼器數量有限，多鏡頭同時播放可能導致部分畫面凍結。
-              建議切換到<span className="font-semibold text-orange-300"> 單鏡頭模式</span>（點擊任一鏡頭放大後再匯出）以獲得最佳效果。
+              📱 {t('export.iosWarning')}
+              {t('export.iosRecommend')}<span className="font-semibold text-orange-300"> {t('export.iosSingleMode')}</span>({t('export.iosBestResult')})
             </div>
           )}
 
           {/* Soft-limit warning */}
           {overSoftLimit && !isExporting && (
             <div className="text-xs text-yellow-500/80 bg-yellow-900/15 rounded-lg px-3 py-2">
-              ⚠️ 匯出超過 3 分鐘，畫面渲染時間較長，請耐心等候。
+              ⚠️ {t('export.longWarning')}
             </div>
           )}
 
           {/* Notice */}
           {useHardwareEncoder ? (
             <p className="text-xs text-[#555] leading-relaxed">
-              ⚡ 使用硬體加速編碼。輸出格式：MP4（H.264）或 WebM，視瀏覽器而定。
+              ⚡ {t('export.webcodecNote')}
             </p>
           ) : (
             <p className="text-xs text-[#555] leading-relaxed">
-              使用 FFmpeg.wasm 編碼。首次使用需下載約 30 MB（下載後快取）。
-              建議使用 Chrome 以獲得硬體加速。
+              {t('export.ffmpegNote')}
+              {t('export.chromeHint')}
             </p>
           )}
         </div>
@@ -393,7 +396,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                   style={{ width: `${Math.round(progress * 100)}%` }} />
               </div>
               <p className="text-xs text-[#555]">
-                {phase ? PHASE_LABELS[phase] : ''}&nbsp;{Math.round(progress * 100)}%
+                {phase ? t(PHASE_LABEL_KEYS[phase]) : ''}&nbsp;{Math.round(progress * 100)}%
               </p>
             </div>
           )}
@@ -401,7 +404,7 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
           {/* Error */}
           {isError && (
             <div className="text-xs text-red-400 bg-red-900/20 rounded-lg px-3 py-2 break-words">
-              {errorMsg || '匯出失敗，請重試'}
+              {errorMsg || t('export.failed')}
             </div>
           )}
 
@@ -415,16 +418,16 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  下載 MP4
+                  {t('export.download')}
                 </button>
                 <button onClick={handleReset}
                   className="px-4 py-2.5 rounded-xl border border-[#2a2a2a] text-[#aaa] text-sm hover:border-[#444] transition-colors">
-                  重新設定
+                  {t('export.reset')}
                 </button>
               </>
             ) : isExporting ? (
               <div className="flex-1 flex items-center justify-center py-2.5 text-[#555] text-sm">
-                匯出中，請稍候…
+                {t('export.exporting')}
               </div>
             ) : (
               <>
@@ -439,11 +442,11 @@ export function ExportModal({ blobUrls, onClose }: ExportModalProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  開始匯出
+                  {t('export.startExport')}
                 </button>
                 <button onClick={onClose}
                   className="px-4 py-2.5 rounded-xl border border-[#2a2a2a] text-[#aaa] text-sm hover:border-[#444] transition-colors">
-                  取消
+                  {t('export.cancel')}
                 </button>
               </>
             )}
