@@ -42,3 +42,14 @@ next-env.d.ts
 
 # output folder (exported videos)
 /output/
+
+# internal docs & dev notes (keep local only)
+/docs/
+/CLAUDE.md
+/競品資料收集/
+
+# test infrastructure
+/tests/
+/vitest.config.ts
+/tsconfig.test.json
+/.babelrc
