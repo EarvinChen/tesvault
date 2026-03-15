@@ -13,6 +13,15 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 const STORAGE_KEY = 'tesvault-language';
 
+// Default translations
+const defaultT = (key: TranslationKey): string => {
+  const translation = translations[key];
+  if (!translation) {
+    return key;
+  }
+  return translation.zh || key;
+};
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>('zh');
   const [mounted, setMounted] = useState(false);
@@ -20,38 +29,38 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   // Load saved language on mount
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem(STORAGE_KEY) as Language | null;
-    if (saved && (saved === 'zh' || saved === 'en')) {
-      setLanguageState(saved);
-    }
-    
-    // Try to detect browser language
-    if (!saved) {
-      const browserLang = navigator.language.toLowerCase();
-      if (browserLang.startsWith('en')) {
-        setLanguageState('en');
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY) as Language | null;
+      if (saved && (saved === 'zh' || saved === 'en')) {
+        setLanguageState(saved);
+      } else if (saved === null) {
+        // Try to detect browser language
+        const browserLang = navigator.language.toLowerCase();
+        if (browserLang.startsWith('en')) {
+          setLanguageState('en');
+        }
       }
+    } catch (e) {
+      // localStorage not available
     }
   }, []);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem(STORAGE_KEY, lang);
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch (e) {
+      // localStorage not available
+    }
   };
 
   const t = (key: TranslationKey): string => {
     const translation = translations[key];
     if (!translation) {
-      console.warn(`Missing translation for key: ${key}`);
       return key;
     }
     return translation[language] || translation.zh || key;
   };
-
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>
