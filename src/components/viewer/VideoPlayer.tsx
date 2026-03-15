@@ -31,7 +31,7 @@ export function VideoPlayer({
   onLoadedMetadata,
   onEnded,
 }: VideoPlayerProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const focusCamera   = useViewerStore((state) => state.focusCamera);
   const unfocusCamera = useViewerStore((state) => state.unfocusCamera);
 
@@ -45,7 +45,7 @@ export function VideoPlayer({
     }
   };
 
-  const cameraLabel   = getCameraLabel(camera, 'zh-TW');
+  const cameraLabel   = getCameraLabel(camera, locale === 'en' ? 'en' : 'zh-TW');
   const cameraLabelEn = getCameraLabel(camera, 'en');
 
   return (

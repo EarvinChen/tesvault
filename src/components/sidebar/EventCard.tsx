@@ -23,7 +23,7 @@ const EVENT_TYPE_COLORS: Record<EventType, string> = {
 };
 
 export function EventCard({ event, isActive }: EventCardProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const selectEvent = useEventStore((state) => state.selectEvent);
 
   const handleClick = () => {
@@ -31,7 +31,7 @@ export function EventCard({ event, isActive }: EventCardProps) {
   };
 
   // Format timestamp
-  const timestamp = event.timestamp.toLocaleString('zh-TW', {
+  const timestamp = event.timestamp.toLocaleString(locale === 'en' ? 'en-US' : 'zh-TW', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
